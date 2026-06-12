@@ -60,6 +60,12 @@ AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh +30
 AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh status
 ```
 
+残り時間を試験用に直接セット:
+
+```sh
+AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh set-seconds 60
+```
+
 停止:
 
 ```sh

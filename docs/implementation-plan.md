@@ -79,7 +79,7 @@
 ## Phase 5: 手動時間追加
 
 1. 親が手動で時間追加できる CLI または簡易 Lambda 呼び出しを作る。AWS CLI 版は完了。
-2. `+30`, `+60`, `stop` コマンドを実装する。AWS CLI 版は完了。
+2. `+30`, `+60`, `set-seconds`, `stop` コマンドを実装する。AWS CLI 版は完了。
 3. DynamoDB 更新処理を `AddUsageCredit` として分離する。
 4. 必要になったら LINE webhook Lambda を追加する。
 
