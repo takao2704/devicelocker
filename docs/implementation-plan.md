@@ -43,6 +43,8 @@
 - `bin/devicelocker-check`
 - `launchd/com.devicelocker.agent.plist`
 - `scripts/install-agent.sh`
+- `scripts/start-agent.sh`
+- `scripts/stop-agent.sh`
 - `scripts/uninstall-agent.sh`
 - `tests/test_devicelocker_check.py`
 

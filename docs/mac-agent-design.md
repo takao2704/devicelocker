@@ -64,7 +64,13 @@ sudo API_BASE_URL="https://example.execute-api.ap-northeast-1.amazonaws.com" \
 LaunchDaemon の読み込み:
 
 ```sh
-sudo launchctl bootstrap system /Library/LaunchDaemons/com.devicelocker.agent.plist
+sudo scripts/start-agent.sh
+```
+
+停止:
+
+```sh
+sudo scripts/stop-agent.sh
 ```
 
 削除:

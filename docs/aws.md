@@ -107,3 +107,17 @@ Lambda は以下を検証する。
 - nonce の再利用
 
 検証後、`usageDeltaSeconds` を `RemainingSeconds` から減らし、残り時間があれば `allow`、ゼロなら `deny` を返す。
+
+## 実機確認
+
+2026-06-12 に Mac 側設定後、以下の手動実行で AWS 連携を確認した。
+
+```sh
+sudo /usr/local/sbin/devicelocker-check
+```
+
+結果:
+
+```text
+allow: remaining_seconds=600
+```
