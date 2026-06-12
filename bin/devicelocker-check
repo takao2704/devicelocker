@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+import base64
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+
+DEFAULT_CONFIG_PATH = "/Library/Application Support/DeviceLocker/config.json"
+DEFAULT_TOKEN_PATH = "/Library/Application Support/DeviceLocker/device.token"
+DEFAULT_STATE_PATH = "/var/db/devicelocker/state.json"
+DEFAULT_LOCK_COMMAND = "/usr/local/sbin/devicelocker-lock"
+DEFAULT_CHECK_PATH = "/v1/check"
+DEFAULT_TIMEOUT_SECONDS = 5
+DEFAULT_GRACE_PERIOD_SECONDS = 60
+DEFAULT_MAX_USAGE_DELTA_SECONDS = 120
+
+
+class ConfigError(Exception):
+    pass
+
+
+class ApiError(Exception):
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
+
+def log(message):
+    print(message, file=sys.stderr)
+
+
+def read_json(path):
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_json_atomic(path, data, mode=0o600):
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target.with_name(f".{target.name}.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, sort_keys=True, separators=(",", ":"))
+        handle.write("\n")
+    os.chmod(tmp_path, mode)
+    os.replace(tmp_path, target)
+
+
+def load_config(path):
+    config = read_json(path)
+    required = ["api_base_url", "user_id", "device_id"]
+    missing = [key for key in required if not config.get(key)]
+    if missing:
+        raise ConfigError(f"missing config keys: {', '.join(missing)}")
+
+    config.setdefault("check_path", DEFAULT_CHECK_PATH)
+    config.setdefault("token_path", DEFAULT_TOKEN_PATH)
+    config.setdefault("state_path", DEFAULT_STATE_PATH)
+    config.setdefault("lock_command", DEFAULT_LOCK_COMMAND)
+    config.setdefault("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
+    config.setdefault("grace_period_seconds", DEFAULT_GRACE_PERIOD_SECONDS)
+    config.setdefault("max_usage_delta_seconds", DEFAULT_MAX_USAGE_DELTA_SECONDS)
+    return config
+
+
+def load_token(path):
+    token = Path(path).read_text(encoding="utf-8").strip()
+    if not token:
+        raise ConfigError("device token is empty")
+    return token
+
+
+def load_state(path):
+    try:
+        return read_json(path)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        log(f"state file is invalid JSON: {path}")
+        return {}
+
+
+def canonical_string(method, path, user_id, device_id, timestamp, usage_delta, nonce):
+    return "\n".join([
+        method,
+        path,
+        f"userId={user_id}",
+        f"deviceId={device_id}",
+        f"timestamp={timestamp}",
+        f"usageDeltaSeconds={usage_delta}",
+        f"nonce={nonce}",
+    ])
+
+
+def sign_request(token, canonical):
+    digest = hmac.new(token.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def clamp_usage_delta(now, state, max_delta):
+    last = state.get("last_success_local_at") or state.get("last_usage_reported_local_at")
+    if not isinstance(last, (int, float)):
+        return 0
+    delta = int(max(0, now - int(last)))
+    return min(delta, int(max_delta))
+
+
+def build_request(config, token, state, now):
+    check_path = config["check_path"]
+    usage_delta = clamp_usage_delta(now, state, config["max_usage_delta_seconds"])
+    nonce = secrets.token_urlsafe(24)
+    canonical = canonical_string(
+        "POST",
+        check_path,
+        config["user_id"],
+        config["device_id"],
+        now,
+        usage_delta,
+        nonce,
+    )
+    signature = sign_request(token, canonical)
+    return {
+        "userId": config["user_id"],
+        "deviceId": config["device_id"],
+        "timestamp": now,
+        "usageDeltaSeconds": usage_delta,
+        "nonce": nonce,
+        "signature": signature,
+    }
+
+
+def post_check(config, body):
+    url = config["api_base_url"].rstrip("/") + config["check_path"]
+    payload = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=float(config["timeout_seconds"])) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise ApiError(f"api returned HTTP {exc.code}", status=exc.code) from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise ApiError(f"api request failed: {exc}") from exc
+
+
+def run_lock(config, state, now):
+    command = config["lock_command"]
+    state["locked_at"] = now
+    write_json_atomic(config["state_path"], state)
+    log(f"locking via {command}")
+    subprocess.run([command], check=False)
+
+
+def state_from_response(response, state, now, grace_period):
+    server_time = int(response.get("serverTime") or now)
+    updated = dict(state)
+    updated["last_success_at"] = server_time
+    updated["last_success_local_at"] = now
+    updated["last_server_time"] = server_time
+    updated["last_decision"] = response.get("decision")
+    updated["remaining_seconds"] = int(response.get("remainingSeconds") or 0)
+    updated["last_usage_reported_at"] = server_time
+    updated["last_usage_reported_local_at"] = now
+    updated["grace_until"] = now + int(grace_period)
+    if "policyVersion" in response:
+        updated["policy_version"] = response["policyVersion"]
+    return updated
+
+
+def within_grace(state, now, grace_period):
+    last = state.get("last_success_local_at")
+    if not isinstance(last, (int, float)):
+        return False
+    return now <= int(last) + int(grace_period)
+
+
+def main(argv):
+    config_path = argv[1] if len(argv) > 1 else os.environ.get("DEVICELOCKER_CONFIG", DEFAULT_CONFIG_PATH)
+    now = int(time.time())
+
+    try:
+        config = load_config(config_path)
+        token = load_token(config["token_path"])
+        state = load_state(config["state_path"])
+    except Exception as exc:
+        log(f"configuration/state failure: {exc}")
+        fallback = {
+            "state_path": DEFAULT_STATE_PATH,
+            "lock_command": DEFAULT_LOCK_COMMAND,
+        }
+        run_lock(fallback, {}, now)
+        return 3
+
+    try:
+        request_body = build_request(config, token, state, now)
+        response = post_check(config, request_body)
+    except ApiError as exc:
+        log(str(exc))
+        if exc.status is not None and 400 <= exc.status < 500:
+            state["last_decision"] = "deny"
+            run_lock(config, state, now)
+            return 2
+        if within_grace(state, now, config["grace_period_seconds"]):
+            log("api unavailable, still within grace period")
+            return 0
+        state["last_decision"] = "deny"
+        run_lock(config, state, now)
+        return 2
+
+    decision = str(response.get("decision", "")).lower()
+    updated_state = state_from_response(response, state, now, config["grace_period_seconds"])
+    write_json_atomic(config["state_path"], updated_state)
+
+    if decision == "allow":
+        log(f"allow: remaining_seconds={updated_state['remaining_seconds']}")
+        return 0
+    if decision == "deny":
+        run_lock(config, updated_state, now)
+        return 2
+
+    log(f"unknown decision: {decision!r}")
+    run_lock(config, updated_state, now)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

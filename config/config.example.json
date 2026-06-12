@@ -1,0 +1,12 @@
+{
+  "api_base_url": "https://example.execute-api.ap-northeast-1.amazonaws.com",
+  "check_path": "/v1/check",
+  "user_id": "child-001",
+  "device_id": "macbook-001",
+  "token_path": "/Library/Application Support/DeviceLocker/device.token",
+  "state_path": "/var/db/devicelocker/state.json",
+  "lock_command": "/usr/local/sbin/devicelocker-lock",
+  "grace_period_seconds": 60,
+  "timeout_seconds": 5,
+  "max_usage_delta_seconds": 120
+}

@@ -17,17 +17,25 @@
 
 ## Phase 2: Mac エージェント試作
 
-1. 設定ファイル、トークン、状態ファイルの読み書きを実装する。
-2. API 呼び出し処理を実装する。
-3. `allow` で残り時間と状態を更新して終了する。
-4. `deny` でロック関数を呼ぶ。
-5. 通信失敗時の 1 分猶予を実装する。
+1. 設定ファイル、トークン、状態ファイルの読み書きを実装する。完了。
+2. API 呼び出し処理を実装する。完了。
+3. `allow` で残り時間と状態を更新して終了する。完了。
+4. `deny` でロック関数を呼ぶ。完了。
+5. 通信失敗時の 1 分猶予を実装する。完了。
 
 完了条件:
 
 - API の応答に応じて状態ファイルが更新される。
 - 通信失敗が 1 分の猶予内ならロックしない。
 - 通信失敗が猶予超過ならロック関数が呼ばれる。
+
+実装:
+
+- `bin/devicelocker-check`
+- `launchd/com.devicelocker.agent.plist`
+- `scripts/install-agent.sh`
+- `scripts/uninstall-agent.sh`
+- `tests/test_devicelocker_check.py`
 
 ## Phase 3: ロック方式検証
 

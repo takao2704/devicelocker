@@ -76,10 +76,12 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
 ```json
 {
   "last_success_at": 1760000005,
+  "last_success_local_at": 1760000005,
   "last_server_time": 1760000005,
   "last_decision": "allow",
   "remaining_seconds": 1740,
   "last_usage_reported_at": 1760000005,
+  "last_usage_reported_local_at": 1760000005,
   "grace_until": 1760000065,
   "locked_at": null,
   "policy_version": 3
@@ -95,10 +97,15 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
 ```json
 {
   "api_base_url": "https://example.execute-api.ap-northeast-1.amazonaws.com",
+  "check_path": "/v1/check",
   "user_id": "child-001",
   "device_id": "macbook-001",
+  "token_path": "/Library/Application Support/DeviceLocker/device.token",
+  "state_path": "/var/db/devicelocker/state.json",
+  "lock_command": "/usr/local/sbin/devicelocker-lock",
   "grace_period_seconds": 60,
-  "retry_after_seconds": 60
+  "timeout_seconds": 5,
+  "max_usage_delta_seconds": 120
 }
 ```
 

@@ -36,6 +36,35 @@
 </plist>
 ```
 
+## インストール
+
+エージェント本体と LaunchDaemon plist は以下で配置する。
+
+```sh
+sudo scripts/install-agent.sh
+```
+
+インストール後、起動前に以下を作成する。
+
+```text
+/Library/Application Support/DeviceLocker/config.json
+/Library/Application Support/DeviceLocker/device.token
+```
+
+`config/config.example.json` を設定ファイルの雛形として使う。
+
+LaunchDaemon の読み込み:
+
+```sh
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.devicelocker.agent.plist
+```
+
+削除:
+
+```sh
+sudo scripts/uninstall-agent.sh
+```
+
 ## 状態遷移
 
 ```text
@@ -61,7 +90,7 @@ call CheckMacStatus
 ## 通信失敗時の扱い
 
 - 前回成功時刻がない場合は、原則としてロックする。
-- 前回成功から `grace_period_seconds` 以内ならロックしない。
+- 前回成功時のローカル時刻 `last_success_local_at` から `grace_period_seconds` 以内ならロックしない。
 - 猶予を超えた場合は deny と同等に扱う。
 - ロック後も次回実行で API 確認を続ける。
 
