@@ -87,10 +87,10 @@ call CheckMacStatus
 現在の候補:
 
 ```text
-/usr/bin/pmset displaysleepnow
+/usr/local/sbin/devicelocker-lock
 ```
 
-この候補は screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
+この候補は root 所有の薄いラッパーとして `/usr/bin/pmset displaysleepnow` を実行する。screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
 
 セットアップ候補:
 
