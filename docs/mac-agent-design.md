@@ -1,0 +1,93 @@
+# Mac エージェント設計
+
+## 配置
+
+| 種別 | パス | 所有者 | 権限 |
+| --- | --- | --- | --- |
+| LaunchDaemon | `/Library/LaunchDaemons/com.devicelocker.agent.plist` | `root:wheel` | `644` |
+| 実行ファイル | `/usr/local/sbin/devicelocker-check` | `root:wheel` | `750` |
+| 設定ディレクトリ | `/Library/Application Support/DeviceLocker` | `root:wheel` | `750` |
+| 状態ディレクトリ | `/var/db/devicelocker` | `root:wheel` | `750` |
+| 状態ファイル | `/var/db/devicelocker/state.json` | `root:wheel` | `600` |
+
+## LaunchDaemon
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.devicelocker.agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/sbin/devicelocker-check</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>60</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/var/log/devicelocker.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/devicelocker.err</string>
+</dict>
+</plist>
+```
+
+## 状態遷移
+
+```text
+start
+  |
+  v
+load config/token/state
+  |
+  v
+call CheckMacStatus
+  |
+  +-- success + allow --> update state --> exit
+  |
+  +-- success + deny  --> update state --> lock --> exit
+  |
+  +-- failure --------> within grace? -- yes --> exit
+                         |
+                         no
+                         v
+                       lock --> exit
+```
+
+## 通信失敗時の扱い
+
+- 前回成功時刻がない場合は初回起動から猶予を開始する。
+- 前回成功から `grace_period_seconds` 以内ならロックしない。
+- 猶予を超えた場合は deny と同等に扱う。
+- ロック後も次回実行で API 確認を続ける。
+
+## ロック実行
+
+ロックコマンドは実装前に対象 macOS で検証して固定する。
+
+検証条件:
+
+- コマンド実行後、画面復帰にパスワード入力が必要であること。
+- root の LaunchDaemon から実行できること。
+- アクティブな GUI セッションに対して効くこと。
+- 実行に過度な副作用がないこと。
+
+候補:
+
+```text
+/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession -suspend
+```
+
+この候補は macOS バージョン差分があり得るため、実機検証が完了するまで仮扱いにする。
+
+## エラー処理
+
+- 設定ファイルが読めない場合はロックする。
+- デバイストークンが読めない場合はロックする。
+- 状態ファイルが壊れている場合は新規状態として扱い、通信できなければロックする。
+- API が 4xx を返した場合は原則 deny と同等に扱う。
+- API が 5xx またはタイムアウトした場合は通信失敗として猶予判定する。
