@@ -54,17 +54,25 @@ scripts/seed-aws-device.sh
 
 ## Mac セットアップ
 
+### 親の管理者アカウントで実行
+
 ロックコマンドをインストールする。
 
 ```sh
 sudo scripts/install-lock-command.sh
 ```
 
+### 子どもアカウントで実行
+
 子どもアカウントで一度だけ screen lock delay を immediate にする。
 
 ```sh
 /usr/local/sbin/devicelocker-lock-spike set-delay-immediate
 ```
+
+このコマンドは子どもアカウントのパスワード入力を求める。復帰時にパスワードが必要になる設定なので、対象の子どもアカウントで実行する。
+
+### 親の管理者アカウントで実行
 
 AWS の CloudFormation output `ApiEndpoint` と、seed 時に表示された device token を使って設定する。
 
