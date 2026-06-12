@@ -90,7 +90,7 @@ call CheckMacStatus
 /usr/local/sbin/devicelocker-lock
 ```
 
-この候補は root 所有の薄いラッパーとして `/usr/bin/pmset displaysleepnow` を実行する。screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
+この候補は root 所有の薄いラッパーとして `/usr/bin/pmset displaysleepnow` を実行する。対象ユーザーの screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
 
 セットアップ候補:
 
@@ -98,7 +98,7 @@ call CheckMacStatus
 /usr/sbin/sysadminctl -screenLock immediate -password -
 ```
 
-この候補は親がパスワードを入力する一回限りの設定として扱う。DeviceLocker の通常実行時にはパスワードを扱わない。
+この候補は対象ユーザーごとの一回限りの設定として扱う。DeviceLocker の通常実行時にはパスワードを扱わない。
 
 旧候補:
 
