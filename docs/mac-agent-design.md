@@ -92,6 +92,8 @@ call CheckMacStatus
 
 この候補は root 所有の薄いラッパーとして `/usr/bin/pmset displaysleepnow` を実行する。対象ユーザーの screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
 
+root LaunchDaemon 経由の検証には、一時的に `launchd/com.devicelocker.locktest.plist` を使う。検証後は `scripts/uninstall-locktest-daemon.sh` で削除する。
+
 セットアップ候補:
 
 ```text

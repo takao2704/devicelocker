@@ -191,3 +191,30 @@ root:wheel 755 /usr/local/sbin/devicelocker-lock-spike
 3. 子どもアカウントで `/usr/local/sbin/devicelocker-lock-spike set-delay-immediate` を実行し、screenLock delay を immediate に設定できるか確認する。
 4. 子どもアカウントで `/usr/local/sbin/devicelocker-lock` を実行し、復帰時にパスワード入力が必要か確認する。
 5. root LaunchDaemon から `/usr/local/sbin/devicelocker-lock` を実行して、GUI セッションに対して効くか確認する。
+
+### root LaunchDaemon 検証
+
+一時的な LaunchDaemon:
+
+```text
+launchd/com.devicelocker.locktest.plist
+```
+
+インストールして即時実行:
+
+```sh
+sudo scripts/install-locktest-daemon.sh
+```
+
+このコマンドは `/Library/LaunchDaemons/com.devicelocker.locktest.plist` を作成し、`launchctl bootstrap system` で読み込む。`RunAtLoad` により、読み込み直後に `/usr/local/sbin/devicelocker-lock` が実行される。
+
+期待結果:
+
+- 画面がスリープする。
+- 復帰時に子どもアカウントのパスワード入力が必要になる。
+
+検証後の削除:
+
+```sh
+sudo scripts/uninstall-locktest-daemon.sh
+```
