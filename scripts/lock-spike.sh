@@ -8,24 +8,21 @@ usage() {
   cat <<'EOF'
 Usage:
   scripts/lock-spike.sh status
-  scripts/lock-spike.sh lock-now
-  scripts/lock-spike.sh set-delay-zero
+  scripts/lock-spike.sh set-delay-immediate
   scripts/lock-spike.sh display-sleep-now
 
 Commands:
   status    Print local lock-related command availability without locking.
-  lock-now  Attempt immediate screen lock using sysadminctl.
-  set-delay-zero
-            Configure screen lock delay to 0 seconds. Prompts for password.
+  set-delay-immediate
+            Configure screen lock delay to immediate. Prompts for password.
   display-sleep-now
             Put the display to sleep using pmset.
 
 Notes:
-  lock-now may interrupt the current desktop session.
-  When run as a normal user, sysadminctl may require a password.
-  DeviceLocker will eventually run the lock command as root via LaunchDaemon.
-  After running lock-now, verify that unlocking requires the user's password.
+  set-delay-immediate is a setup step, not the recurring lock command.
+  DeviceLocker will eventually run display-sleep-now via LaunchDaemon.
   display-sleep-now depends on the current screen lock delay setting.
+  After running display-sleep-now, verify that unlocking requires the user's password.
 EOF
 }
 
@@ -53,26 +50,13 @@ status() {
   fi
 }
 
-lock_now() {
+set_delay_immediate() {
   if [ ! -x "$LOCK_CMD" ]; then
     echo "sysadminctl is not available" >&2
     exit 1
   fi
 
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "warning: running as non-root; sysadminctl may require a password" >&2
-  fi
-
-  exec "$LOCK_CMD" -screenLock immediate
-}
-
-set_delay_zero() {
-  if [ ! -x "$LOCK_CMD" ]; then
-    echo "sysadminctl is not available" >&2
-    exit 1
-  fi
-
-  exec "$LOCK_CMD" -screenLock 0 -password -
+  exec "$LOCK_CMD" -screenLock immediate -password -
 }
 
 display_sleep_now() {
@@ -88,11 +72,8 @@ case "${1:-}" in
   status)
     status
     ;;
-  lock-now)
-    lock_now
-    ;;
-  set-delay-zero)
-    set_delay_zero
+  set-delay-immediate)
+    set_delay_immediate
     ;;
   display-sleep-now)
     display_sleep_now

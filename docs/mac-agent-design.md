@@ -90,15 +90,15 @@ call CheckMacStatus
 /usr/bin/pmset displaysleepnow
 ```
 
-この候補は screenLock delay を 0 または十分短い値にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
+この候補は screenLock delay を immediate にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
 
-不採用候補:
+セットアップ候補:
 
 ```text
-/usr/sbin/sysadminctl -screenLock immediate
+/usr/sbin/sysadminctl -screenLock immediate -password -
 ```
 
-この候補は通常ユーザー実行と sudo 実行の両方で `Password is required!` となった。`sysadminctl -help` 上も `-password <password>` が必須のため、LaunchDaemon からの無人ロック実行には採用しない。
+この候補は親がパスワードを入力する一回限りの設定として扱う。DeviceLocker の通常実行時にはパスワードを扱わない。
 
 旧候補:
 
