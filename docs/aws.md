@@ -166,3 +166,19 @@ allow: remaining_seconds=3796
 ```
 
 `stop` 後に LaunchDaemon が deny を受け取り、ロックコマンドを実行できることを確認済み。`start` と `+30` 後は AWS 側が `IsApproved=true`, `RemainingSeconds=3796` に戻ることを確認済み。
+
+自然ゼロ到達の確認:
+
+```sh
+AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh set-seconds 60
+tail -n 0 -f /var/log/devicelocker.err
+```
+
+エージェントログ:
+
+```text
+2026-06-12T21:29:58+0900 allow: remaining_seconds=1675
+2026-06-12T21:30:58+0900 locking via /usr/local/sbin/devicelocker-lock
+```
+
+AWS 側で `RemainingSeconds=0` になった後、次回チェックで LaunchDaemon がロックコマンドを実行できることを確認済み。確認後は `+30` で `RemainingSeconds=1800` に戻した。

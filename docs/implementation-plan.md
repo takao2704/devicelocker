@@ -39,6 +39,7 @@
 - 通信失敗が猶予超過ならロック関数が呼ばれる。
 - root LaunchDaemon として起動し、AWS から `allow` を取得できる。完了。
 - AWS 側の `stop` 操作後に root LaunchDaemon がロックコマンドを実行できる。完了。
+- AWS 側の `RemainingSeconds=0` 到達後に root LaunchDaemon がロックコマンドを実行できる。完了。
 
 実装:
 
