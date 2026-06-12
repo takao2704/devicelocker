@@ -137,3 +137,20 @@ allow: remaining_seconds=2239
 ```
 
 `com.devicelocker.agent` が root LaunchDaemon として起動し、AWS から `allow` を取得できることを確認済み。
+
+手動停止と復帰の確認:
+
+```sh
+AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh stop
+AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh start
+AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh +30
+```
+
+エージェントログ:
+
+```text
+locking via /usr/local/sbin/devicelocker-lock
+allow: remaining_seconds=3796
+```
+
+`stop` 後に LaunchDaemon が deny を受け取り、ロックコマンドを実行できることを確認済み。`start` と `+30` 後は AWS 側が `IsApproved=true`, `RemainingSeconds=3796` に戻ることを確認済み。
