@@ -9,6 +9,7 @@ API_BASE_URL="${API_BASE_URL:-}"
 DEVICE_TOKEN="${DEVICE_TOKEN:-}"
 USER_ID="${USER_ID:-child-001}"
 DEVICE_ID="${DEVICE_ID:-macbook-001}"
+MONITORED_USER_NAME="${MONITORED_USER_NAME:-yuuto}"
 CHECK_PATH="${CHECK_PATH:-/v1/check}"
 GRACE_PERIOD_SECONDS="${GRACE_PERIOD_SECONDS:-60}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-5}"
@@ -43,6 +44,7 @@ cat > "$CONFIG_PATH" <<JSON
   "check_path": "$CHECK_PATH",
   "user_id": "$USER_ID",
   "device_id": "$DEVICE_ID",
+  "monitored_user_name": "$MONITORED_USER_NAME",
   "token_path": "$TOKEN_PATH",
   "state_path": "/var/db/devicelocker/state.json",
   "lock_command": "$LOCK_COMMAND",

@@ -3,6 +3,7 @@
   "check_path": "/v1/check",
   "user_id": "child-001",
   "device_id": "macbook-001",
+  "monitored_user_name": "yuuto",
   "token_path": "/Library/Application Support/DeviceLocker/device.token",
   "state_path": "/var/db/devicelocker/state.json",
   "lock_command": "/usr/local/sbin/devicelocker-lock",

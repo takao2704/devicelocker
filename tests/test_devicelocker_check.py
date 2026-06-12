@@ -68,6 +68,40 @@ class DeviceLockerCheckTests(unittest.TestCase):
         self.assertEqual(state["remaining_seconds"], 1200)
         self.assertEqual(state["last_success_at"], 1000)
         self.assertEqual(state["last_success_local_at"], 2000)
+        self.assertEqual(state["usage_baseline_local_at"], 2000)
+
+    def test_skips_when_console_user_is_not_monitored_user(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["monitored_user_name"] = "yuuto"
+        self.config_path.write_text(json.dumps(config), encoding="utf-8")
+
+        with mock.patch.object(self.module, "get_console_user", return_value="takaoide"), \
+             mock.patch.object(self.module, "post_check") as post_check, \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        post_check.assert_not_called()
+        run.assert_not_called()
+        state = self.read_state()
+        self.assertEqual(state["last_console_user"], "takaoide")
+        self.assertEqual(state["last_skipped_local_at"], 2000)
+        self.assertEqual(state["usage_baseline_local_at"], 2000)
+
+    def test_usage_delta_uses_usage_baseline_after_skip(self):
+        config = self.module.load_config(str(self.config_path))
+        token = self.module.load_token(str(self.token_path))
+        state = {
+            "last_success_local_at": 1000,
+            "last_usage_reported_local_at": 1000,
+            "usage_baseline_local_at": 1990,
+        }
+
+        with mock.patch.object(self.module.secrets, "token_urlsafe", return_value="nonce-1"):
+            body = self.module.build_request(config, token, state, 2000)
+
+        self.assertEqual(body["usageDeltaSeconds"], 10)
 
     def test_deny_runs_lock(self):
         response = {

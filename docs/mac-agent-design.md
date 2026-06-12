@@ -85,7 +85,15 @@ sudo scripts/uninstall-agent.sh
 start
   |
   v
-load config/token/state
+load config
+  |
+  v
+active console user is target?
+  |
+  +-- no --> update usage baseline --> exit
+  |
+  v
+load token/state
   |
   v
 call CheckMacStatus
@@ -108,9 +116,17 @@ call CheckMacStatus
 - 猶予を超えた場合は deny と同等に扱う。
 - ロック後も次回実行で API 確認を続ける。
 
+## 対象ユーザー判定
+
+- `config.json` の `monitored_user_name` が設定されている場合、`/dev/console` の所有ユーザーが一致するときだけ AWS にチェックを送る。
+- 現在のコンソールユーザーが対象外の場合は、利用時間を減らさず、ロックもしない。
+- 対象外ユーザーでスキップした時刻を `usage_baseline_local_at` に保存し、親アカウント利用中の経過時間を次回 `usageDeltaSeconds` に含めない。
+- `monitored_user_name` は初期運用では子どもアカウント名の `yuuto` を設定する。
+
 ## 利用時間の消費
 
 - MVP では LaunchDaemon の実行間隔を利用し、前回成功から今回成功までの経過秒数を `usageDeltaSeconds` として API に報告する。
+- `monitored_user_name` が設定されている場合は、対象ユーザーが前面のコンソールユーザーのときだけ `usageDeltaSeconds` を報告する。
 - サーバーは報告された `usageDeltaSeconds` を残り時間から減算する。
 - `usageDeltaSeconds` は過大報告や異常値を防ぐため、サーバー側で 0 から 120 秒程度に丸める。
 - 残り時間がゼロ以下になった場合、API は `deny` を返す。

@@ -9,6 +9,7 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 - Mac が 60 秒ごとに AWS の `POST /v1/check` を確認する。
 - AWS 側の `RemainingSeconds` が利用時間に応じて減る。
 - `RemainingSeconds=0` で Mac がロックされる。
+- `monitored_user_name` に設定した子どもアカウントが前面のときだけ利用時間を消費し、ロック対象にする。
 - `stop` 操作で Mac がロックされる。
 - `start` と `+30` で利用を再開できる。
 - オフラインまたは API 失敗時は 1 分の猶予後にロックする。
@@ -80,6 +81,12 @@ AWS の CloudFormation output `ApiEndpoint` と、seed 時に表示された dev
 sudo API_BASE_URL="https://xxxxx.execute-api.ap-northeast-1.amazonaws.com" \
   DEVICE_TOKEN="表示された device token" \
   scripts/install-device-config.sh
+```
+
+既存の設定に対象ユーザーだけ追加・変更する場合:
+
+```sh
+sudo scripts/set-monitored-user.sh yuuto
 ```
 
 エージェントをインストールする。

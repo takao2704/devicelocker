@@ -83,6 +83,9 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "remaining_seconds": 1740,
   "last_usage_reported_at": 1760000005,
   "last_usage_reported_local_at": 1760000005,
+  "usage_baseline_local_at": 1760000005,
+  "last_console_user": "yuuto",
+  "last_skipped_local_at": null,
   "grace_until": 1760000065,
   "locked_at": null,
   "policy_version": 3
@@ -101,6 +104,7 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "check_path": "/v1/check",
   "user_id": "child-001",
   "device_id": "macbook-001",
+  "monitored_user_name": "yuuto",
   "token_path": "/Library/Application Support/DeviceLocker/device.token",
   "state_path": "/var/db/devicelocker/state.json",
   "lock_command": "/usr/local/sbin/devicelocker-lock",
