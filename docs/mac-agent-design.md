@@ -84,13 +84,21 @@ call CheckMacStatus
 - アクティブな GUI セッションに対して効くこと。
 - 実行に過度な副作用がないこと。
 
-第一候補:
+現在の候補:
+
+```text
+/usr/bin/pmset displaysleepnow
+```
+
+この候補は screenLock delay を 0 または十分短い値にするセットアップ手順と組み合わせて検証する。`pmset displaysleepnow` 単体では即時ロックを保証しない。
+
+不採用候補:
 
 ```text
 /usr/sbin/sysadminctl -screenLock immediate
 ```
 
-この候補は macOS 14.8.7 でコマンドの存在と `screenLock status` を確認済み。実際のロック成立は、手動実行と root LaunchDaemon 経由の両方で確認する。
+この候補は通常ユーザー実行と sudo 実行の両方で `Password is required!` となった。`sysadminctl -help` 上も `-password <password>` が必須のため、LaunchDaemon からの無人ロック実行には採用しない。
 
 旧候補:
 

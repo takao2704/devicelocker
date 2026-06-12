@@ -70,35 +70,61 @@ $ scripts/lock-spike.sh lock-now
 2026-06-12 20:16:10.239 sysadminctl[33772:277674] Password is required!
 ```
 
+sudo 実行結果:
+
+```text
+$ sudo scripts/lock-spike.sh lock-now
+2026-06-12 20:17:43.167 sysadminctl[37129:283204] Password is required!
+```
+
 結論:
 
 - 通常ユーザー実行ではパスワード要求で止まる。
-- DeviceLocker は root LaunchDaemon から実行するため、次の確認は root 実行時にパスワードなしで即時ロックできるかを見る。
+- sudo による root 実行でもパスワード要求で止まる。
+- `sysadminctl -help` 上も `-screenLock <status || immediate || off || seconds> -password <password>` が必須。
+- LaunchDaemon からの無人ロック実行には採用しない。
 
 ## 採用候補
 
-MVP では以下を root LaunchDaemon から実行する第一候補にする。
+MVP では、セットアップ時に screenLock delay を短くしたうえで、実行時に以下を呼ぶ案を次候補にする。
+
+セットアップ時:
 
 ```text
-/usr/sbin/sysadminctl -screenLock immediate
+/usr/sbin/sysadminctl -screenLock 0 -password -
 ```
 
-root LaunchDaemon から実行して効かない場合は、次の順で代替を検証する。
+このコマンドは親がパスワードを入力する一回限りの設定として扱う。DeviceLocker の通常実行時にはパスワードを扱わない。
 
-1. `launchctl asuser <console_uid>` 経由で `sysadminctl -screenLock immediate`
-2. `pmset displaysleepnow` と screenLock delay の強制設定
-3. MDM または構成プロファイル
+ロック実行時:
+
+```text
+/usr/bin/pmset displaysleepnow
+```
+
+この方式は `pmset displaysleepnow` 単体ではなく、事前設定と組み合わせて検証する。
+
+1. セットアップ時に screenLock delay を 0 または十分短い値にする。
+2. `pmset displaysleepnow` 実行後、復帰時にパスワード入力が必要か確認する。
+3. root LaunchDaemon から `pmset displaysleepnow` を実行して、GUI セッションに対して効くか確認する。
+
+効かない場合は、次の順で代替を検証する。
+
+1. `launchctl asuser <console_uid>` 経由でユーザーセッション内からロック相当の操作を実行する。
+2. 構成プロファイルで screenLock delay を強制する。
+3. MDM を使う。
 
 ## 受け入れ条件
 
 - 通常ユーザー実行ではパスワード要求になることを確認済み。
-- root LaunchDaemon から実行しても画面が即時ロックされる。
+- sudo による root 実行でも `sysadminctl -screenLock immediate` はパスワード要求になることを確認済み。
+- 採用候補コマンドを root LaunchDaemon から実行して画面がロックされる。
 - 復帰時にパスワード入力が必要になる。
 - 子ども用標準ユーザーから停止・変更できない。
 - ロック後も LaunchDaemon の次回実行が継続される。
 
 ## 次の検証
 
-1. `sudo scripts/lock-spike.sh lock-now` で root 実行時にパスワードなしでロックできるか確認する。
-2. 復帰時にパスワード入力が必要か確認する。
+1. `scripts/lock-spike.sh set-delay-zero` で screenLock delay を 0 にできるか確認する。
+2. `scripts/lock-spike.sh display-sleep-now` で復帰時にパスワード入力が必要か確認する。
 3. root LaunchDaemon から同じコマンドを実行して、GUI セッションに対して効くか確認する。

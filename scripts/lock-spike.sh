@@ -9,16 +9,23 @@ usage() {
 Usage:
   scripts/lock-spike.sh status
   scripts/lock-spike.sh lock-now
+  scripts/lock-spike.sh set-delay-zero
+  scripts/lock-spike.sh display-sleep-now
 
 Commands:
   status    Print local lock-related command availability without locking.
   lock-now  Attempt immediate screen lock using sysadminctl.
+  set-delay-zero
+            Configure screen lock delay to 0 seconds. Prompts for password.
+  display-sleep-now
+            Put the display to sleep using pmset.
 
 Notes:
   lock-now may interrupt the current desktop session.
   When run as a normal user, sysadminctl may require a password.
   DeviceLocker will eventually run the lock command as root via LaunchDaemon.
   After running lock-now, verify that unlocking requires the user's password.
+  display-sleep-now depends on the current screen lock delay setting.
 EOF
 }
 
@@ -59,12 +66,36 @@ lock_now() {
   exec "$LOCK_CMD" -screenLock immediate
 }
 
+set_delay_zero() {
+  if [ ! -x "$LOCK_CMD" ]; then
+    echo "sysadminctl is not available" >&2
+    exit 1
+  fi
+
+  exec "$LOCK_CMD" -screenLock 0 -password -
+}
+
+display_sleep_now() {
+  if [ ! -x "$PMSET_CMD" ]; then
+    echo "pmset is not available" >&2
+    exit 1
+  fi
+
+  exec "$PMSET_CMD" displaysleepnow
+}
+
 case "${1:-}" in
   status)
     status
     ;;
   lock-now)
     lock_now
+    ;;
+  set-delay-zero)
+    set_delay_zero
+    ;;
+  display-sleep-now)
+    display_sleep_now
     ;;
   -h|--help|help|"")
     usage
