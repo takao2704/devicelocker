@@ -22,6 +22,28 @@
 | `LastUsageReportedAt` | Number | Mac から最後に利用時間が報告された時刻 |
 | `PolicyVersion` | Number | ポリシー更新ごとに増加するバージョン |
 | `DeviceEnabled` | Boolean | 端末が有効かどうか |
+| `RewardRulesJson` | String | 親 Web UI の報酬ルール JSON |
+| `ParentHistoryJson` | String | 親 Web UI の最近の操作履歴 JSON |
+| `LastParentActionAt` | Number | 親 Web UI から最後に操作した時刻 |
+| `LastParentActionBy` | String | 最後に操作した親のメールアドレス |
+
+`RewardRulesJson` は以下の配列を JSON 文字列として保存する。
+
+```json
+[
+  {
+    "id": "calc-drill",
+    "name": "計算ドリル",
+    "unitName": "ページ",
+    "minutesPerUnit": 5,
+    "allowQuantity": true,
+    "quickQuantities": [1, 2, 3, 5],
+    "icon": "book-open"
+  }
+]
+```
+
+MVP では親 Web UI と CLI の両方が同じ `RemainingSeconds` / `IsApproved` を更新する。報酬ルールと履歴は親 Web UI 専用の補助属性として扱う。
 
 ## DynamoDB: DeviceLockerDevices
 

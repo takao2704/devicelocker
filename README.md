@@ -2,7 +2,7 @@
 
 DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し、残り時間ゼロまたは親の停止操作で Mac をロックする MVP。
 
-対象ユーザーは管理者権限を持たない子どもアカウント。親は AWS CLI で時間を追加・停止・再開する。
+対象ユーザーは管理者権限を持たない子どもアカウント。親は AWS CLI または親向け Web UI で時間を追加・停止・再開する。
 
 ## 現在できること
 
@@ -14,6 +14,7 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 - `stop` 操作で Mac がロックされる。
 - `start` と `+30` で利用を再開できる。
 - オフラインまたは API 失敗時は 1 分の猶予後にロックする。
+- 親向け Web UI は Cognito + Google アカウント認証で Parent Web API を呼び出せる。
 
 ## 構成
 
@@ -24,6 +25,8 @@ Mac LaunchDaemon
 
 AWS
   API Gateway HTTP API: POST /v1/check
+  API Gateway HTTP API: /v1/parent/*
+  Cognito User Pool: parent Google sign-in
   Lambda: DeviceLockerCheckMacStatus
   DynamoDB: DeviceLockerControl
   DynamoDB: DeviceLockerDevices
@@ -131,6 +134,12 @@ sudo scripts/uninstall-agent.sh
 ```
 
 ## 親の操作
+
+### Web UI
+
+スマホ向けの親管理画面は [prototypes/parent-time-ui](prototypes/parent-time-ui) にある。Amplify Hosting + Cognito + Google アカウント認証で使う場合の設定は [docs/aws.md](docs/aws.md) を参照する。
+
+### AWS CLI
 
 残り時間を 30 分追加する。
 

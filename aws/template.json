@@ -1,6 +1,63 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "DeviceLocker MVP API",
+  "Parameters": {
+    "ParentAllowedEmails": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Comma-separated Google account email addresses allowed to use the parent API."
+    },
+    "ParentAllowedUserIds": {
+      "Type": "String",
+      "Default": "child-001",
+      "Description": "Comma-separated child user IDs that the parent API may manage."
+    },
+    "ParentChildName": {
+      "Type": "String",
+      "Default": "yuuto",
+      "Description": "Display name returned to the parent web UI."
+    },
+    "ParentAuthDomainPrefix": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional globally-unique Cognito hosted UI domain prefix."
+    },
+    "ParentCallbackUrls": {
+      "Type": "CommaDelimitedList",
+      "Default": "http://127.0.0.1:4173/",
+      "Description": "Comma-separated callback URLs for the parent web UI."
+    },
+    "ParentLogoutUrls": {
+      "Type": "CommaDelimitedList",
+      "Default": "http://127.0.0.1:4173/",
+      "Description": "Comma-separated logout URLs for the parent web UI."
+    },
+    "GoogleOAuthClientId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Google OAuth client ID for Cognito social sign-in."
+    },
+    "GoogleOAuthClientSecret": {
+      "Type": "String",
+      "Default": "",
+      "NoEcho": true,
+      "Description": "Google OAuth client secret for Cognito social sign-in."
+    }
+  },
+  "Conditions": {
+    "EnableGoogleProvider": {
+      "Fn::And": [
+        { "Fn::Not": [{ "Fn::Equals": [{ "Ref": "GoogleOAuthClientId" }, ""] }] },
+        { "Fn::Not": [{ "Fn::Equals": [{ "Ref": "GoogleOAuthClientSecret" }, ""] }] }
+      ]
+    },
+    "DisableGoogleProvider": {
+      "Fn::Not": [{ "Condition": "EnableGoogleProvider" }]
+    },
+    "EnableParentHostedUiDomain": {
+      "Fn::Not": [{ "Fn::Equals": [{ "Ref": "ParentAuthDomainPrefix" }, ""] }]
+    }
+  },
   "Resources": {
     "ControlTable": {
       "Type": "AWS::DynamoDB::Table",
@@ -104,7 +161,14 @@
             "NONCE_TABLE": { "Ref": "NonceTable" },
             "TIMESTAMP_TOLERANCE_SECONDS": "300",
             "MAX_USAGE_DELTA_SECONDS": "120",
-            "NONCE_TTL_SECONDS": "600"
+            "NONCE_TTL_SECONDS": "600",
+            "PARENT_ALLOWED_EMAILS": { "Ref": "ParentAllowedEmails" },
+            "PARENT_ALLOWED_USER_IDS": { "Ref": "ParentAllowedUserIds" },
+            "DEFAULT_PARENT_USER_ID": "child-001",
+            "PARENT_CHILD_NAME": { "Ref": "ParentChildName" },
+            "MAX_PARENT_ADD_MINUTES": "360",
+            "PARENT_HISTORY_LIMIT": "20",
+            "ONLINE_WINDOW_SECONDS": "180"
           }
         },
         "Code": {
@@ -112,11 +176,115 @@
         }
       }
     },
+    "ParentUserPool": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "UserPoolName": "DeviceLockerParentUserPool",
+        "UsernameAttributes": ["email"],
+        "AutoVerifiedAttributes": ["email"],
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true
+        },
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 12,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": false,
+            "RequireUppercase": true
+          }
+        }
+      }
+    },
+    "ParentGoogleIdentityProvider": {
+      "Type": "AWS::Cognito::UserPoolIdentityProvider",
+      "Condition": "EnableGoogleProvider",
+      "Properties": {
+        "UserPoolId": { "Ref": "ParentUserPool" },
+        "ProviderName": "Google",
+        "ProviderType": "Google",
+        "ProviderDetails": {
+          "client_id": { "Ref": "GoogleOAuthClientId" },
+          "client_secret": { "Ref": "GoogleOAuthClientSecret" },
+          "authorize_scopes": "email profile openid"
+        },
+        "AttributeMapping": {
+          "email": "email"
+        }
+      }
+    },
+    "ParentUserPoolClientWithGoogle": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Condition": "EnableGoogleProvider",
+      "DependsOn": "ParentGoogleIdentityProvider",
+      "Properties": {
+        "UserPoolId": { "Ref": "ParentUserPool" },
+        "ClientName": "DeviceLockerParentWeb",
+        "GenerateSecret": false,
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthFlows": ["code"],
+        "AllowedOAuthScopes": ["openid", "email", "profile"],
+        "CallbackURLs": { "Ref": "ParentCallbackUrls" },
+        "LogoutURLs": { "Ref": "ParentLogoutUrls" },
+        "SupportedIdentityProviders": ["Google"],
+        "ReadAttributes": ["email", "email_verified"],
+        "WriteAttributes": ["email"],
+        "PreventUserExistenceErrors": "ENABLED",
+        "AccessTokenValidity": 1,
+        "IdTokenValidity": 1,
+        "RefreshTokenValidity": 30,
+        "TokenValidityUnits": {
+          "AccessToken": "hours",
+          "IdToken": "hours",
+          "RefreshToken": "days"
+        }
+      }
+    },
+    "ParentUserPoolClientWithoutGoogle": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Condition": "DisableGoogleProvider",
+      "Properties": {
+        "UserPoolId": { "Ref": "ParentUserPool" },
+        "ClientName": "DeviceLockerParentWeb",
+        "GenerateSecret": false,
+        "AllowedOAuthFlowsUserPoolClient": true,
+        "AllowedOAuthFlows": ["code"],
+        "AllowedOAuthScopes": ["openid", "email", "profile"],
+        "CallbackURLs": { "Ref": "ParentCallbackUrls" },
+        "LogoutURLs": { "Ref": "ParentLogoutUrls" },
+        "SupportedIdentityProviders": ["COGNITO"],
+        "ReadAttributes": ["email", "email_verified"],
+        "WriteAttributes": ["email"],
+        "PreventUserExistenceErrors": "ENABLED",
+        "AccessTokenValidity": 1,
+        "IdTokenValidity": 1,
+        "RefreshTokenValidity": 30,
+        "TokenValidityUnits": {
+          "AccessToken": "hours",
+          "IdToken": "hours",
+          "RefreshToken": "days"
+        }
+      }
+    },
+    "ParentUserPoolDomain": {
+      "Type": "AWS::Cognito::UserPoolDomain",
+      "Condition": "EnableParentHostedUiDomain",
+      "Properties": {
+        "Domain": { "Ref": "ParentAuthDomainPrefix" },
+        "UserPoolId": { "Ref": "ParentUserPool" }
+      }
+    },
     "HttpApi": {
       "Type": "AWS::ApiGatewayV2::Api",
       "Properties": {
         "Name": "DeviceLockerApi",
-        "ProtocolType": "HTTP"
+        "ProtocolType": "HTTP",
+        "CorsConfiguration": {
+          "AllowOrigins": ["*"],
+          "AllowHeaders": ["authorization", "content-type"],
+          "AllowMethods": ["GET", "POST", "PUT", "OPTIONS"],
+          "MaxAge": 300
+        }
       }
     },
     "CheckIntegration": {
@@ -130,11 +298,94 @@
         "PayloadFormatVersion": "2.0"
       }
     },
+    "ParentJwtAuthorizer": {
+      "Type": "AWS::ApiGatewayV2::Authorizer",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "AuthorizerType": "JWT",
+        "IdentitySource": ["$request.header.Authorization"],
+        "JwtConfiguration": {
+          "Audience": [
+            {
+              "Fn::If": [
+                "EnableGoogleProvider",
+                { "Ref": "ParentUserPoolClientWithGoogle" },
+                { "Ref": "ParentUserPoolClientWithoutGoogle" }
+              ]
+            }
+          ],
+          "Issuer": {
+            "Fn::Sub": "https://cognito-idp.${AWS::Region}.amazonaws.com/${ParentUserPool}"
+          }
+        },
+        "Name": "DeviceLockerParentJwtAuthorizer"
+      }
+    },
     "CheckRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
         "ApiId": { "Ref": "HttpApi" },
         "RouteKey": "POST /v1/check",
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentStatusRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "GET /v1/parent/status",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentAddTimeRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "POST /v1/parent/add-time",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentStopRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "POST /v1/parent/stop",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentStartRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "POST /v1/parent/start",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentRewardRulesGetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "GET /v1/parent/reward-rules",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "ParentRewardRulesPutRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "PUT /v1/parent/reward-rules",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": { "Ref": "ParentJwtAuthorizer" },
         "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
       }
     },
@@ -156,6 +407,17 @@
           "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/v1/check"
         }
       }
+    },
+    "ParentLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": { "Ref": "CheckMacStatusFunction" },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/v1/parent/*"
+        }
+      }
     }
   },
   "Outputs": {
@@ -167,6 +429,36 @@
     },
     "DevicesTableName": {
       "Value": { "Ref": "DevicesTable" }
+    },
+    "ParentUserPoolId": {
+      "Value": { "Ref": "ParentUserPool" }
+    },
+    "ParentUserPoolClientId": {
+      "Value": {
+        "Fn::If": [
+          "EnableGoogleProvider",
+          { "Ref": "ParentUserPoolClientWithGoogle" },
+          { "Ref": "ParentUserPoolClientWithoutGoogle" }
+        ]
+      }
+    },
+    "ParentCognitoDomain": {
+      "Value": {
+        "Fn::If": [
+          "EnableParentHostedUiDomain",
+          { "Fn::Sub": "https://${ParentAuthDomainPrefix}.auth.${AWS::Region}.amazoncognito.com" },
+          ""
+        ]
+      }
+    },
+    "GoogleAuthorizedRedirectUri": {
+      "Value": {
+        "Fn::If": [
+          "EnableParentHostedUiDomain",
+          { "Fn::Sub": "https://${ParentAuthDomainPrefix}.auth.${AWS::Region}.amazoncognito.com/oauth2/idpresponse" },
+          ""
+        ]
+      }
     }
   }
 }

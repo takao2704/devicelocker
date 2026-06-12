@@ -26,6 +26,56 @@ STACK_NAME=devicelocker-dev AWS_REGION=ap-northeast-1 scripts/deploy-aws.sh
 
 `deploy-aws.sh` は CloudFormation stack を作成または更新し、その後 `aws/check_mac_status/app.py` を zip 化して Lambda コードを更新する。
 
+親向け Web UI を Google アカウント認証で使う場合は、Cognito Hosted UI 用の domain prefix を決めて 2 段階でデプロイする。prefix はリージョン内で一意にする。
+
+1 回目は Google OAuth client をまだ指定せず、Cognito domain と Google 登録用 URI を作る。
+
+```sh
+export AWS_REGION=ap-northeast-1
+export PARENT_ALLOWED_EMAILS="parent@example.com"
+export PARENT_ALLOWED_USER_IDS="child-001"
+export PARENT_CHILD_NAME="yuuto"
+export PARENT_AUTH_DOMAIN_PREFIX="devicelocker-parent-unique-name"
+export PARENT_CALLBACK_URLS="http://127.0.0.1:4173/"
+export PARENT_LOGOUT_URLS="http://127.0.0.1:4173/"
+scripts/deploy-aws.sh
+```
+
+CloudFormation output の `GoogleAuthorizedRedirectUri` を Google Cloud Console の OAuth client に Authorized redirect URI として登録する。
+
+```text
+https://<cognito-domain>.auth.ap-northeast-1.amazoncognito.com/oauth2/idpresponse
+```
+
+Google OAuth client ID / secret を取得したら、2 回目のデプロイで Google provider を有効にする。
+
+```sh
+export GOOGLE_OAUTH_CLIENT_ID="Google OAuth client ID"
+export GOOGLE_OAUTH_CLIENT_SECRET="Google OAuth client secret"
+scripts/deploy-aws.sh
+```
+
+Amplify Hosting に載せる場合は、Amplify 側のURLが決まった後に `PARENT_CALLBACK_URLS` と `PARENT_LOGOUT_URLS` を本番URLへ変更して再デプロイする。例:
+
+```sh
+export PARENT_CALLBACK_URLS="https://main.example.amplifyapp.com/"
+export PARENT_LOGOUT_URLS="https://main.example.amplifyapp.com/"
+scripts/deploy-aws.sh
+```
+
+Amplify Hosting の環境変数には以下を設定する。`amplify.yml` が `prototypes/parent-time-ui/src/config.js` を生成する。
+
+| 環境変数 | 値 |
+| --- | --- |
+| `DEVICELOCKER_API_BASE_URL` | CloudFormation output `ApiEndpoint` |
+| `DEVICELOCKER_COGNITO_DOMAIN` | CloudFormation output `ParentCognitoDomain` |
+| `DEVICELOCKER_COGNITO_CLIENT_ID` | CloudFormation output `ParentUserPoolClientId` |
+| `DEVICELOCKER_REDIRECT_URI` | `https://main.example.amplifyapp.com/` |
+| `DEVICELOCKER_LOGOUT_URI` | `https://main.example.amplifyapp.com/` |
+| `DEVICELOCKER_USER_ID` | `child-001` |
+
+親 Web UI は Cognito の ID token を `Authorization: Bearer ...` として親APIへ送る。API Gateway の JWT authorizer が署名・issuer・audience を検証し、Lambda が `email` claim を `PARENT_ALLOWED_EMAILS` と照合する。
+
 ## 初期データ投入
 
 ```sh

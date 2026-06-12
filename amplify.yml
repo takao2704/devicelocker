@@ -1,0 +1,21 @@
+version: 1
+frontend:
+  phases:
+    build:
+      commands:
+        - |
+          cat > prototypes/parent-time-ui/src/config.js <<EOF
+          window.DEVICELOCKER_CONFIG = {
+            apiBaseUrl: "${DEVICELOCKER_API_BASE_URL}",
+            cognitoDomain: "${DEVICELOCKER_COGNITO_DOMAIN}",
+            cognitoClientId: "${DEVICELOCKER_COGNITO_CLIENT_ID}",
+            redirectUri: "${DEVICELOCKER_REDIRECT_URI}",
+            logoutUri: "${DEVICELOCKER_LOGOUT_URI}",
+            userId: "${DEVICELOCKER_USER_ID:-child-001}",
+            identityProvider: "Google",
+          };
+          EOF
+  artifacts:
+    baseDirectory: prototypes/parent-time-ui
+    files:
+      - "**/*"

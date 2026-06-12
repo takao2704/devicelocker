@@ -63,6 +63,7 @@ button {
 }
 
 .brand,
+.top-actions,
 .sync-button,
 .section-title > div,
 .text-button,
@@ -97,6 +98,10 @@ button {
   height: 28px;
 }
 
+.top-actions {
+  gap: 6px;
+}
+
 .sync-button,
 .text-button,
 .icon-button {
@@ -117,6 +122,60 @@ button {
 .icon-button svg {
   width: 19px;
   height: 19px;
+}
+
+.top-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.notice {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.notice.error {
+  color: var(--danger);
+  background: #fff7f7;
+}
+
+.login-panel {
+  display: grid;
+  gap: 14px;
+  padding: 44px 16px;
+  text-align: center;
+}
+
+.login-mark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: 50%;
+  color: #183456;
+  background: var(--surface-subtle);
+}
+
+.login-mark svg {
+  width: 30px;
+  height: 30px;
+}
+
+.login-panel h1 {
+  font-size: 26px;
+}
+
+.login-panel p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .summary-band {
@@ -477,7 +536,10 @@ h1 {
   color: var(--danger);
 }
 
-.secondary:disabled {
+.primary:disabled,
+.secondary:disabled,
+.sync-button:disabled,
+.icon-button:disabled {
   opacity: 0.45;
 }
 
