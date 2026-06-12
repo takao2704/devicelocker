@@ -121,3 +121,19 @@ sudo /usr/local/sbin/devicelocker-check
 ```text
 allow: remaining_seconds=600
 ```
+
+LaunchDaemon 起動後の確認:
+
+```sh
+sudo scripts/start-agent.sh
+tail -f /var/log/devicelocker.err
+```
+
+結果:
+
+```text
+allow: remaining_seconds=480
+allow: remaining_seconds=2239
+```
+
+`com.devicelocker.agent` が root LaunchDaemon として起動し、AWS から `allow` を取得できることを確認済み。
