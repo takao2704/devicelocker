@@ -84,13 +84,21 @@ call CheckMacStatus
 - アクティブな GUI セッションに対して効くこと。
 - 実行に過度な副作用がないこと。
 
-候補:
+第一候補:
+
+```text
+/usr/sbin/sysadminctl -screenLock immediate
+```
+
+この候補は macOS 14.8.7 でコマンドの存在と `screenLock status` を確認済み。実際のロック成立は、手動実行と root LaunchDaemon 経由の両方で確認する。
+
+旧候補:
 
 ```text
 /System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession -suspend
 ```
 
-この候補は macOS バージョン差分があり得るため、実機検証が完了するまで仮扱いにする。
+この旧候補は macOS 14.8.7 ではパスが存在しなかったため採用しない。
 
 ## エラー処理
 
