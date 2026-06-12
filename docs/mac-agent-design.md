@@ -93,6 +93,11 @@ active console user is target?
   +-- no --> update usage baseline --> exit
   |
   v
+screen locked?
+  |
+  +-- yes --> update usage baseline --> exit
+  |
+  v
 load token/state
   |
   v
@@ -123,14 +128,21 @@ call CheckMacStatus
 - 対象外ユーザーでスキップした時刻を `usage_baseline_local_at` に保存し、親アカウント利用中の経過時間を次回 `usageDeltaSeconds` に含めない。
 - `monitored_user_name` は初期運用では子どもアカウント名の `yuuto` を設定する。
 
+## 画面ロック中の扱い
+
+- `ioreg -n Root -d1 -a` の `IOConsoleLocked` が true の場合は、AWS にチェックを送らず、ロックコマンドも実行しない。
+- 画面ロック中にスキップした時刻を `usage_baseline_local_at` に保存し、ロック中の経過時間を次回 `usageDeltaSeconds` に含めない。
+- 画面ロック中に親が `stop` した場合、その時点では既にロック状態なので追加操作はしない。ロック解除後の次回チェックで AWS 側の `deny` を反映する。
+
 ## 利用時間の消費
 
 - MVP では LaunchDaemon の実行間隔を利用し、前回成功から今回成功までの経過秒数を `usageDeltaSeconds` として API に報告する。
 - `monitored_user_name` が設定されている場合は、対象ユーザーが前面のコンソールユーザーのときだけ `usageDeltaSeconds` を報告する。
+- 画面ロック中は `usageDeltaSeconds` を報告しない。
 - サーバーは報告された `usageDeltaSeconds` を残り時間から減算する。
 - `usageDeltaSeconds` は過大報告や異常値を防ぐため、サーバー側で 0 から 120 秒程度に丸める。
 - 残り時間がゼロ以下になった場合、API は `deny` を返す。
-- 画面ロック中やログアウト中の時間を消費対象に含めるかは後続で精密化する。MVP では実装と運用の簡単さを優先し、エージェントが定期実行できている時間を消費対象にする。
+- ログアウト中の扱いは後続で精密化する。
 
 ## ロック実行
 
@@ -185,5 +197,6 @@ root LaunchDaemon 経由の検証には、一時的に `launchd/com.devicelocker
 
 ```text
 2026-06-12T21:30:00+0900 allow: remaining_seconds=1800
+2026-06-12T21:30:30+0900 skip: screen_locked=true
 2026-06-12T21:31:00+0900 locking via /usr/local/sbin/devicelocker-lock
 ```

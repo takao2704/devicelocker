@@ -86,6 +86,9 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "usage_baseline_local_at": 1760000005,
   "last_console_user": "yuuto",
   "last_skipped_local_at": null,
+  "last_skip_reason": null,
+  "screen_locked": false,
+  "last_screen_locked_local_at": null,
   "grace_until": 1760000065,
   "locked_at": null,
   "policy_version": 3

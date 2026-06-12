@@ -10,6 +10,7 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 - AWS 側の `RemainingSeconds` が利用時間に応じて減る。
 - `RemainingSeconds=0` で Mac がロックされる。
 - `monitored_user_name` に設定した子どもアカウントが前面のときだけ利用時間を消費し、ロック対象にする。
+- 画面ロック中は利用時間を消費しない。
 - `stop` 操作で Mac がロックされる。
 - `start` と `+30` で利用を再開できる。
 - オフラインまたは API 失敗時は 1 分の猶予後にロックする。
@@ -101,7 +102,7 @@ sudo scripts/install-agent.sh
 sudo /usr/local/sbin/devicelocker-check
 ```
 
-`allow: remaining_seconds=...` が出れば AWS 連携成功。
+親アカウントのデスクトップで実行した場合は `skip: console_user=takaoide monitored_user=yuuto` が出れば対象ユーザー判定は成功。子どもアカウントが前面で、画面ロックされていない状態では `allow: remaining_seconds=...` が出れば AWS 連携成功。
 
 ## 起動と停止
 

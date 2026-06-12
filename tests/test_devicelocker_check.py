@@ -59,6 +59,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
             "policyVersion": 2,
         }
         with mock.patch.object(self.module, "post_check", return_value=response), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
              mock.patch.object(self.module.time, "time", return_value=2000):
             code = self.module.main(["devicelocker-check", str(self.config_path)])
 
@@ -89,6 +90,41 @@ class DeviceLockerCheckTests(unittest.TestCase):
         self.assertEqual(state["last_skipped_local_at"], 2000)
         self.assertEqual(state["usage_baseline_local_at"], 2000)
 
+    def test_skips_when_screen_is_locked(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["monitored_user_name"] = "yuuto"
+        self.config_path.write_text(json.dumps(config), encoding="utf-8")
+
+        with mock.patch.object(self.module, "get_console_user", return_value="yuuto"), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=True), \
+             mock.patch.object(self.module, "post_check") as post_check, \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        post_check.assert_not_called()
+        run.assert_not_called()
+        state = self.read_state()
+        self.assertTrue(state["screen_locked"])
+        self.assertEqual(state["last_screen_locked_local_at"], 2000)
+        self.assertEqual(state["last_skip_reason"], "screen_locked")
+        self.assertEqual(state["usage_baseline_local_at"], 2000)
+
+    def test_is_screen_locked_reads_ioreg(self):
+        ioreg_output = b"""<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>IOConsoleLocked</key>
+  <true/>
+</dict>
+</plist>
+"""
+        result = mock.Mock(stdout=ioreg_output)
+
+        with mock.patch.object(self.module.subprocess, "run", return_value=result):
+            self.assertTrue(self.module.is_screen_locked())
+
     def test_usage_delta_uses_usage_baseline_after_skip(self):
         config = self.module.load_config(str(self.config_path))
         token = self.module.load_token(str(self.token_path))
@@ -110,6 +146,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
             "serverTime": 1000,
         }
         with mock.patch.object(self.module, "post_check", return_value=response), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
              mock.patch.object(self.module.subprocess, "run") as run, \
              mock.patch.object(self.module.time, "time", return_value=2000):
             code = self.module.main(["devicelocker-check", str(self.config_path)])
@@ -121,6 +158,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
     def test_api_failure_within_grace_does_not_lock(self):
         self.state_path.write_text(json.dumps({"last_success_local_at": 1990}), encoding="utf-8")
         with mock.patch.object(self.module, "post_check", side_effect=self.module.ApiError("offline")), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
              mock.patch.object(self.module.subprocess, "run") as run, \
              mock.patch.object(self.module.time, "time", return_value=2000):
             code = self.module.main(["devicelocker-check", str(self.config_path)])
@@ -131,6 +169,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
     def test_api_failure_after_grace_locks(self):
         self.state_path.write_text(json.dumps({"last_success_local_at": 1000}), encoding="utf-8")
         with mock.patch.object(self.module, "post_check", side_effect=self.module.ApiError("offline")), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
              mock.patch.object(self.module.subprocess, "run") as run, \
              mock.patch.object(self.module.time, "time", return_value=2000):
             code = self.module.main(["devicelocker-check", str(self.config_path)])

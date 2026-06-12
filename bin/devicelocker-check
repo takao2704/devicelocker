@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+import plistlib
 import pwd
 import secrets
 import subprocess
@@ -78,6 +79,20 @@ def get_console_user():
         return pwd.getpwuid(uid).pw_name
     except (KeyError, OSError):
         return None
+
+
+def is_screen_locked():
+    try:
+        result = subprocess.run(
+            ["/usr/sbin/ioreg", "-n", "Root", "-d1", "-a"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        info = plistlib.loads(result.stdout)
+        return bool(info.get("IOConsoleLocked"))
+    except (OSError, subprocess.SubprocessError, plistlib.InvalidFileException, TypeError, ValueError):
+        return False
 
 
 def load_token(path):
@@ -176,6 +191,16 @@ def run_lock(config, state, now):
     subprocess.run([command], check=False)
 
 
+def skip_usage(config, state, now, reason, updates):
+    updated = dict(state)
+    updated["last_skipped_local_at"] = now
+    updated["last_skip_reason"] = reason
+    updated["usage_baseline_local_at"] = now
+    updated.update(updates)
+    write_json_atomic(config["state_path"], updated)
+    return updated
+
+
 def state_from_response(response, state, now, grace_period):
     server_time = int(response.get("serverTime") or now)
     updated = dict(state)
@@ -187,6 +212,7 @@ def state_from_response(response, state, now, grace_period):
     updated["last_usage_reported_at"] = server_time
     updated["last_usage_reported_local_at"] = now
     updated["usage_baseline_local_at"] = now
+    updated["screen_locked"] = False
     updated["grace_until"] = now + int(grace_period)
     if "policyVersion" in response:
         updated["policy_version"] = response["policyVersion"]
@@ -211,12 +237,17 @@ def main(argv):
             console_user = get_console_user()
             if console_user != monitored_user_name:
                 state = load_state(config["state_path"])
-                state["last_skipped_local_at"] = now
-                state["last_console_user"] = console_user
-                state["usage_baseline_local_at"] = now
-                write_json_atomic(config["state_path"], state)
+                skip_usage(config, state, now, "console_user", {"last_console_user": console_user})
                 log(f"skip: console_user={console_user or 'unknown'} monitored_user={monitored_user_name}")
                 return 0
+        if is_screen_locked():
+            state = load_state(config["state_path"])
+            skip_usage(config, state, now, "screen_locked", {
+                "screen_locked": True,
+                "last_screen_locked_local_at": now,
+            })
+            log("skip: screen_locked=true")
+            return 0
         token = load_token(config["token_path"])
         state = load_state(config["state_path"])
     except Exception as exc:
