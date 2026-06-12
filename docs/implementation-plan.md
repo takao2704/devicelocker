@@ -2,11 +2,11 @@
 
 ## Phase 1: AWS 判定 API
 
-1. DynamoDB テーブルを定義する。
-2. `CheckMacStatus` Lambda を実装する。
-3. 署名なしで `remainingSeconds` による `allow` / `deny` 判定を確認する。
-4. API Gateway から Lambda を呼び出せるようにする。
-5. テストデータで `RemainingSeconds` と `IsApproved` の判定を確認する。
+1. DynamoDB テーブルを定義する。完了。
+2. `CheckMacStatus` Lambda を実装する。完了。
+3. HMAC 署名付きで `remainingSeconds` による `allow` / `deny` 判定を確認する。ローカルテスト完了。
+4. API Gateway から Lambda を呼び出せるようにする。CloudFormation 定義完了。
+5. テストデータで `RemainingSeconds` と `IsApproved` の判定を確認する。ローカルテスト完了。
 
 完了条件:
 
@@ -14,6 +14,15 @@
 - `RemainingSeconds=0` なら `deny` が返る。
 - `RemainingSeconds>0` なら `allow` が返る。
 - `usageDeltaSeconds` に応じて `RemainingSeconds` が減る。
+
+実装:
+
+- `aws/check_mac_status/app.py`
+- `aws/template.json`
+- `scripts/deploy-aws.sh`
+- `scripts/seed-aws-device.sh`
+- `scripts/update-aws-credit.sh`
+- `tests/test_check_mac_status_lambda.py`
 
 ## Phase 2: Mac エージェント試作
 
@@ -65,8 +74,8 @@
 
 ## Phase 5: 手動時間追加
 
-1. 親が手動で時間追加できる CLI または簡易 Lambda 呼び出しを作る。
-2. `+30`, `+60`, `stop` コマンドを実装する。
+1. 親が手動で時間追加できる CLI または簡易 Lambda 呼び出しを作る。AWS CLI 版は完了。
+2. `+30`, `+60`, `stop` コマンドを実装する。AWS CLI 版は完了。
 3. DynamoDB 更新処理を `AddUsageCredit` として分離する。
 4. 必要になったら LINE webhook Lambda を追加する。
 

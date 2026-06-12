@@ -1,0 +1,172 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "DeviceLocker MVP API",
+  "Resources": {
+    "ControlTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "DeviceLockerControl",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          { "AttributeName": "UserId", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "UserId", "KeyType": "HASH" }
+        ]
+      }
+    },
+    "DevicesTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "DeviceLockerDevices",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          { "AttributeName": "DeviceId", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "DeviceId", "KeyType": "HASH" }
+        ]
+      }
+    },
+    "NonceTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "DeviceLockerNonce",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          { "AttributeName": "DeviceId", "AttributeType": "S" },
+          { "AttributeName": "Nonce", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "DeviceId", "KeyType": "HASH" },
+          { "AttributeName": "Nonce", "KeyType": "RANGE" }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "ExpiresAt",
+          "Enabled": true
+        }
+      }
+    },
+    "CheckMacStatusRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "lambda.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "DeviceLockerDynamoAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": [
+                    { "Fn::GetAtt": ["ControlTable", "Arn"] },
+                    { "Fn::GetAtt": ["DevicesTable", "Arn"] },
+                    { "Fn::GetAtt": ["NonceTable", "Arn"] }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CheckMacStatusFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "DeviceLockerCheckMacStatus",
+        "Runtime": "python3.12",
+        "Handler": "app.handler",
+        "Role": { "Fn::GetAtt": ["CheckMacStatusRole", "Arn"] },
+        "Timeout": 10,
+        "MemorySize": 128,
+        "Environment": {
+          "Variables": {
+            "CONTROL_TABLE": { "Ref": "ControlTable" },
+            "DEVICES_TABLE": { "Ref": "DevicesTable" },
+            "NONCE_TABLE": { "Ref": "NonceTable" },
+            "TIMESTAMP_TOLERANCE_SECONDS": "300",
+            "MAX_USAGE_DELTA_SECONDS": "120",
+            "NONCE_TTL_SECONDS": "600"
+          }
+        },
+        "Code": {
+          "ZipFile": "def handler(event, context):\n    raise Exception('Package aws/check_mac_status/app.py and update this Lambda code during deployment.')\n"
+        }
+      }
+    },
+    "HttpApi": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {
+        "Name": "DeviceLockerApi",
+        "ProtocolType": "HTTP"
+      }
+    },
+    "CheckIntegration": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CheckMacStatusFunction.Arn}/invocations"
+        },
+        "PayloadFormatVersion": "2.0"
+      }
+    },
+    "CheckRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "POST /v1/check",
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
+    "DefaultStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "StageName": "$default",
+        "AutoDeploy": true
+      }
+    },
+    "LambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": { "Ref": "CheckMacStatusFunction" },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/v1/check"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiEndpoint": {
+      "Value": { "Fn::GetAtt": ["HttpApi", "ApiEndpoint"] }
+    },
+    "ControlTableName": {
+      "Value": { "Ref": "ControlTable" }
+    },
+    "DevicesTableName": {
+      "Value": { "Ref": "DevicesTable" }
+    }
+  }
+}

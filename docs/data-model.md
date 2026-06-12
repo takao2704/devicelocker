@@ -39,7 +39,8 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
 | --- | --- | --- |
 | `DeviceId` | String | パーティションキー |
 | `UserId` | String | 紐づくユーザー |
-| `TokenHash` | String | デバイストークンのハッシュ |
+| `DeviceToken` | String | MVP 用の HMAC 共有秘密 |
+| `TokenHash` | String | 次フェーズで使うデバイストークンのハッシュ |
 | `TokenSecretRef` | String | Secrets Manager などに置く場合の参照 |
 | `Enabled` | Boolean | 端末の有効状態 |
 | `CreatedAt` | Number | 登録時刻 |
