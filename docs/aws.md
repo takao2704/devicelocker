@@ -41,6 +41,16 @@ scripts/seed-aws-device.sh
 /Library/Application Support/DeviceLocker/device.token
 ```
 
+Mac 側設定のインストール:
+
+```sh
+sudo API_BASE_URL="https://example.execute-api.ap-northeast-1.amazonaws.com" \
+  DEVICE_TOKEN="表示された device token" \
+  scripts/install-device-config.sh
+```
+
+`API_BASE_URL` は deploy 後の CloudFormation output `ApiEndpoint` を使う。
+
 ## 手動の時間追加
 
 MVP では親の手動操作として DynamoDB を直接更新する。
@@ -61,8 +71,6 @@ AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh stop
 ```sh
 AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh start
 ```
-
-API endpoint は deploy 後の CloudFormation output `ApiEndpoint` を使う。
 
 Mac 側の `config.json` 例:
 

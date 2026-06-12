@@ -53,6 +53,14 @@ sudo scripts/install-agent.sh
 
 `config/config.example.json` を設定ファイルの雛形として使う。
 
+AWS デプロイ後は、表示された API endpoint と device token を使って以下で設定できる。
+
+```sh
+sudo API_BASE_URL="https://example.execute-api.ap-northeast-1.amazonaws.com" \
+  DEVICE_TOKEN="表示された device token" \
+  scripts/install-device-config.sh
+```
+
 LaunchDaemon の読み込み:
 
 ```sh
