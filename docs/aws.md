@@ -66,6 +66,12 @@ AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh status
 AWS_REGION=ap-northeast-1 scripts/update-aws-credit.sh set-seconds 60
 ```
 
+自然ゼロ試験では、過去ログと混ざらないように別ターミナルで以下を使う。
+
+```sh
+tail -n 0 -f /var/log/devicelocker.err
+```
+
 停止:
 
 ```sh

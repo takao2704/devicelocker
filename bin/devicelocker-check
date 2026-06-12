@@ -34,7 +34,8 @@ class ApiError(Exception):
 
 
 def log(message):
-    print(message, file=sys.stderr)
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime())
+    print(f"{timestamp} {message}", file=sys.stderr)
 
 
 def read_json(path):

@@ -160,3 +160,14 @@ root LaunchDaemon 経由の検証には、一時的に `launchd/com.devicelocker
 - 状態ファイルが壊れている場合は新規状態として扱い、通信できなければロックする。
 - API が 4xx を返した場合は原則 deny と同等に扱う。
 - API が 5xx またはタイムアウトした場合は通信失敗として猶予判定する。
+
+## ログ
+
+`/var/log/devicelocker.err` に時刻付きで判定結果を出力する。
+
+例:
+
+```text
+2026-06-12T21:30:00+0900 allow: remaining_seconds=1800
+2026-06-12T21:31:00+0900 locking via /usr/local/sbin/devicelocker-lock
+```
