@@ -15,7 +15,9 @@ Commands:
   lock-now  Attempt immediate screen lock using sysadminctl.
 
 Notes:
-  lock-now will interrupt the current desktop session.
+  lock-now may interrupt the current desktop session.
+  When run as a normal user, sysadminctl may require a password.
+  DeviceLocker will eventually run the lock command as root via LaunchDaemon.
   After running lock-now, verify that unlocking requires the user's password.
 EOF
 }
@@ -48,6 +50,10 @@ lock_now() {
   if [ ! -x "$LOCK_CMD" ]; then
     echo "sysadminctl is not available" >&2
     exit 1
+  fi
+
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "warning: running as non-root; sysadminctl may require a password" >&2
   fi
 
   exec "$LOCK_CMD" -screenLock immediate
