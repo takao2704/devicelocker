@@ -2,7 +2,7 @@
 
 ## DynamoDB: DeviceLockerControl
 
-初期版は 1 テーブル構成とし、ユーザーまたは端末単位の許可状態を保持する。
+初期版は 1 テーブル構成とし、ユーザーまたは端末単位の残り利用可能時間を保持する。
 
 ### キー
 
@@ -16,9 +16,10 @@
 | --- | --- | --- |
 | `UserId` | String | パーティションキー |
 | `DeviceId` | String | 初期版では代表端末 ID |
-| `AllowUntil` | Number | 利用許可終了時刻。Unix epoch seconds |
+| `RemainingSeconds` | Number | 残り利用可能秒数 |
 | `IsApproved` | Boolean | 利用承認中かどうか |
 | `UpdatedAt` | Number | 最終更新時刻。Unix epoch seconds |
+| `LastUsageReportedAt` | Number | Mac から最後に利用時間が報告された時刻 |
 | `PolicyVersion` | Number | ポリシー更新ごとに増加するバージョン |
 | `DeviceEnabled` | Boolean | 端末が有効かどうか |
 
@@ -77,8 +78,9 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "last_success_at": 1760000005,
   "last_server_time": 1760000005,
   "last_decision": "allow",
-  "allow_until": 1760003600,
-  "grace_until": 1760000305,
+  "remaining_seconds": 1740,
+  "last_usage_reported_at": 1760000005,
+  "grace_until": 1760000065,
   "locked_at": null,
   "policy_version": 3
 }
@@ -95,7 +97,7 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "api_base_url": "https://example.execute-api.ap-northeast-1.amazonaws.com",
   "user_id": "child-001",
   "device_id": "macbook-001",
-  "grace_period_seconds": 300,
+  "grace_period_seconds": 60,
   "retry_after_seconds": 60
 }
 ```

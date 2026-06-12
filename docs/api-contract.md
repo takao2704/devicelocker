@@ -2,7 +2,7 @@
 
 ## CheckMacStatus
 
-Mac エージェントが現在の利用可否を確認する API。
+Mac エージェントが現在の利用可否を確認し、前回チェックからの利用時間を報告する API。
 
 ### エンドポイント
 
@@ -17,6 +17,7 @@ POST /v1/check
   "userId": "child-001",
   "deviceId": "macbook-001",
   "timestamp": 1760000000,
+  "usageDeltaSeconds": 60,
   "nonce": "base64url-random",
   "signature": "hex-or-base64url-hmac"
 }
@@ -32,6 +33,7 @@ POST
 userId=<userId>
 deviceId=<deviceId>
 timestamp=<timestamp>
+usageDeltaSeconds=<usageDeltaSeconds>
 nonce=<nonce>
 ```
 
@@ -41,6 +43,7 @@ HMAC アルゴリズムは `HMAC-SHA256` とする。
 
 - `deviceId` が登録済みであること。
 - `timestamp` がサーバー時刻から許容範囲内であること。
+- `usageDeltaSeconds` が許容範囲内であること。
 - `nonce` が直近に使用されていないこと。
 - `signature` がデバイストークンで検証できること。
 
@@ -49,9 +52,9 @@ HMAC アルゴリズムは `HMAC-SHA256` とする。
 ```json
 {
   "decision": "allow",
-  "allowUntil": 1760003600,
+  "remainingSeconds": 1740,
   "serverTime": 1760000005,
-  "reason": "within_allow_until",
+  "reason": "remaining_time_available",
   "retryAfterSeconds": 60,
   "policyVersion": 3
 }
@@ -68,22 +71,22 @@ HMAC アルゴリズムは `HMAC-SHA256` とする。
 
 | 値 | 意味 |
 | --- | --- |
-| `within_allow_until` | 許可期限内 |
+| `remaining_time_available` | 残り利用可能時間がある |
 | `not_approved` | 承認されていない |
-| `expired` | 許可期限切れ |
+| `time_exhausted` | 残り利用可能時間がゼロ |
 | `device_disabled` | 端末が無効 |
 | `invalid_request` | 入力または署名が不正 |
 
-## UpdateAllowance
+## AddUsageCredit
 
-保護者インターフェースから許可状態を更新する内部 API。
+保護者インターフェースから利用可能時間を追加する内部 API。MVP では親の手動操作を前提にする。
 
 ### 入力
 
 ```json
 {
   "userId": "child-001",
-  "command": "60",
+  "command": "+60",
   "requestedBy": "line-user-id",
   "requestedAt": 1760000000
 }
@@ -93,8 +96,8 @@ HMAC アルゴリズムは `HMAC-SHA256` とする。
 
 | command | 更新内容 |
 | --- | --- |
-| `30` | 現在時刻から 30 分許可 |
-| `60` | 現在時刻から 60 分許可 |
+| `+30` | 残り利用可能時間に 30 分追加 |
+| `+60` | 残り利用可能時間に 60 分追加 |
 | `stop` | `IsApproved=false` にする |
 
 ### 出力
@@ -103,7 +106,7 @@ HMAC アルゴリズムは `HMAC-SHA256` とする。
 {
   "userId": "child-001",
   "isApproved": true,
-  "allowUntil": 1760003600,
+  "remainingSeconds": 3600,
   "updatedAt": 1760000000,
   "policyVersion": 4
 }

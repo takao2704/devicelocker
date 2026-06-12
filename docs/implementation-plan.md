@@ -4,28 +4,29 @@
 
 1. DynamoDB テーブルを定義する。
 2. `CheckMacStatus` Lambda を実装する。
-3. 署名なしで `allow` / `deny` 判定を確認する。
+3. 署名なしで `remainingSeconds` による `allow` / `deny` 判定を確認する。
 4. API Gateway から Lambda を呼び出せるようにする。
-5. テストデータで `AllowUntil` と `IsApproved` の判定を確認する。
+5. テストデータで `RemainingSeconds` と `IsApproved` の判定を確認する。
 
 完了条件:
 
 - `IsApproved=false` で `deny` が返る。
-- `AllowUntil` が過去なら `deny` が返る。
-- `AllowUntil` が未来なら `allow` が返る。
+- `RemainingSeconds=0` なら `deny` が返る。
+- `RemainingSeconds>0` なら `allow` が返る。
+- `usageDeltaSeconds` に応じて `RemainingSeconds` が減る。
 
 ## Phase 2: Mac エージェント試作
 
 1. 設定ファイル、トークン、状態ファイルの読み書きを実装する。
 2. API 呼び出し処理を実装する。
-3. `allow` で状態更新して終了する。
+3. `allow` で残り時間と状態を更新して終了する。
 4. `deny` でロック関数を呼ぶ。
-5. 通信失敗時の 5 分猶予を実装する。
+5. 通信失敗時の 1 分猶予を実装する。
 
 完了条件:
 
 - API の応答に応じて状態ファイルが更新される。
-- 通信失敗が猶予内ならロックしない。
+- 通信失敗が 1 分の猶予内ならロックしない。
 - 通信失敗が猶予超過ならロック関数が呼ばれる。
 
 ## Phase 3: ロック方式検証
@@ -54,17 +55,16 @@
 - 古い timestamp が拒否される。
 - 同じ nonce の再利用が拒否される。
 
-## Phase 5: LINE Bot
+## Phase 5: 手動時間追加
 
-1. LINE webhook Lambda を作る。
-2. 親 LINE ユーザー ID の allowlist を設定する。
-3. `30`, `60`, `stop` コマンドを実装する。
-4. DynamoDB 更新処理を `UpdateAllowance` として分離する。
+1. 親が手動で時間追加できる CLI または簡易 Lambda 呼び出しを作る。
+2. `+30`, `+60`, `stop` コマンドを実装する。
+3. DynamoDB 更新処理を `AddUsageCredit` として分離する。
+4. 必要になったら LINE webhook Lambda を追加する。
 
 完了条件:
 
-- LINE から許可時間を更新できる。
-- 未許可ユーザーからの操作は拒否される。
+- 親が手動で残り利用可能時間を追加できる。
 - 更新後に Mac 側 API の判定が変わる。
 
 ## 直近で決めること
@@ -72,4 +72,4 @@
 - AWS IaC は CDK / SAM / Terraform のどれにするか。
 - Lambda 実装言語を Python / TypeScript のどちらにするか。
 - Mac エージェントを shell / Python / Swift のどれで実装するか。
-- LINE Bot を MVP に同時投入するか、まずは CLI 更新で代替するか。
+- LINE Bot を後続に回し、MVP は CLI 更新で代替する。

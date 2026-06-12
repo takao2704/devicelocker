@@ -47,7 +47,7 @@ load config/token/state
   v
 call CheckMacStatus
   |
-  +-- success + allow --> update state --> exit
+  +-- success + allow --> update remaining time/state --> exit
   |
   +-- success + deny  --> update state --> lock --> exit
   |
@@ -60,10 +60,18 @@ call CheckMacStatus
 
 ## 通信失敗時の扱い
 
-- 前回成功時刻がない場合は初回起動から猶予を開始する。
+- 前回成功時刻がない場合は、原則としてロックする。
 - 前回成功から `grace_period_seconds` 以内ならロックしない。
 - 猶予を超えた場合は deny と同等に扱う。
 - ロック後も次回実行で API 確認を続ける。
+
+## 利用時間の消費
+
+- MVP では LaunchDaemon の実行間隔を利用し、前回成功から今回成功までの経過秒数を `usageDeltaSeconds` として API に報告する。
+- サーバーは報告された `usageDeltaSeconds` を残り時間から減算する。
+- `usageDeltaSeconds` は過大報告や異常値を防ぐため、サーバー側で 0 から 120 秒程度に丸める。
+- 残り時間がゼロ以下になった場合、API は `deny` を返す。
+- 画面ロック中やログアウト中の時間を消費対象に含めるかは後続で精密化する。MVP では実装と運用の簡単さを優先し、エージェントが定期実行できている時間を消費対象にする。
 
 ## ロック実行
 
