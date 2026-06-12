@@ -213,8 +213,19 @@ sudo scripts/install-locktest-daemon.sh
 - 画面がスリープする。
 - 復帰時に子どもアカウントのパスワード入力が必要になる。
 
+実行結果:
+
+- root LaunchDaemon から `/usr/local/sbin/devicelocker-lock` を実行できた。
+- 画面スリープ後、復帰時に子どもアカウントのパスワード入力が必要だった。
+
 検証後の削除:
 
 ```sh
 sudo scripts/uninstall-locktest-daemon.sh
 ```
+
+結論:
+
+- MVP のロック方式として採用する。
+- セットアップ時に対象ユーザーの screenLock delay を immediate にする。
+- 通常実行時は root LaunchDaemon から `/usr/local/sbin/devicelocker-lock` を呼び出す。
