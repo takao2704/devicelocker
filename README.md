@@ -18,19 +18,48 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 
 ## 構成
 
-```text
-Mac LaunchDaemon
-  /usr/local/sbin/devicelocker-check
-  /usr/local/sbin/devicelocker-lock
+```mermaid
+flowchart TB
+  subgraph Parent["親"]
+    ParentBrowser["スマホ/PC ブラウザ<br/>Parent Web UI"]
+    Google["Google アカウント"]
+  end
 
-AWS
-  API Gateway HTTP API: POST /v1/check
-  API Gateway HTTP API: /v1/parent/*
-  Cognito User Pool: parent Google sign-in
-  Lambda: DeviceLockerCheckMacStatus
-  DynamoDB: DeviceLockerControl
-  DynamoDB: DeviceLockerDevices
-  DynamoDB: DeviceLockerNonce
+  subgraph ChildMac["子ども用 Mac"]
+    LaunchDaemon["LaunchDaemon<br/>com.devicelocker.agent"]
+    Check["/usr/local/sbin/devicelocker-check"]
+    Lock["/usr/local/sbin/devicelocker-lock"]
+    Config["config.json<br/>device.token"]
+    Screen["画面ロック"]
+  end
+
+  subgraph AWS["AWS"]
+    Api["API Gateway HTTP API"]
+    Cognito["Cognito User Pool<br/>Google Hosted UI"]
+    Lambda["Lambda<br/>DeviceLockerCheckMacStatus"]
+    Control["DynamoDB<br/>DeviceLockerControl<br/>残り時間/承認状態/履歴"]
+    Devices["DynamoDB<br/>DeviceLockerDevices<br/>端末/DeviceToken"]
+    Nonce["DynamoDB<br/>DeviceLockerNonce<br/>リプレイ防止"]
+  end
+
+  ParentBrowser -->|"GET /parent-ui"| Api
+  ParentBrowser -->|"Google ログイン"| Cognito
+  Cognito --> Google
+  ParentBrowser -->|"JWT Bearer<br/>/v1/parent/*"| Api
+
+  LaunchDaemon --> Check
+  Check --> Config
+  Check -->|"HMAC 署名<br/>POST /v1/check"| Api
+  Check -->|"deny / offline / time_exhausted"| Lock
+  Lock --> Screen
+
+  Api --> Lambda
+  Lambda --> Control
+  Lambda --> Devices
+  Lambda --> Nonce
+  Lambda -->|"allow / deny<br/>remainingSeconds"| Api
+  Api --> ParentBrowser
+  Api --> Check
 ```
 
 ## 前提

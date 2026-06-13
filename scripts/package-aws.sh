@@ -33,10 +33,10 @@ window.DEVICELOCKER_CONFIG = {
 };
 """.strip().replace("</script", "<\\/script")
 
-html = html.replace('    <link rel="stylesheet" href="./src/styles.css?v=20260613-usage-history" />', f"    <style>\n{styles}\n    </style>")
+html = html.replace('    <link rel="stylesheet" href="./src/styles.css?v=20260613-history-chart" />', f"    <style>\n{styles}\n    </style>")
 html = html.replace('    <script src="./src/lucide.min.js"></script>', f"    <script>\n{lucide}\n    </script>")
 html = html.replace('    <script src="./src/config.js"></script>', f"    <script>\n{config}\n    </script>")
-html = html.replace('    <script src="./src/app.js?v=20260613-usage-history"></script>', f"    <script>\n{app}\n    </script>")
+html = html.replace('    <script src="./src/app.js?v=20260613-history-chart"></script>', f"    <script>\n{app}\n    </script>")
 
 (build_dir / "parent_ui.html").write_text(html, encoding="utf-8")
 PY

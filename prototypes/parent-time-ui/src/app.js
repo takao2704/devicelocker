@@ -313,7 +313,7 @@ function formatHistoryTime(at) {
 function normalizeHistory(items = []) {
   return items.map((item) => ({
     id: item.id || crypto.randomUUID(),
-    at: Number(item.at || 0),
+    at: Number(item.at || Math.floor(Date.now() / 1000)),
     time: item.time || formatHistoryTime(item.at),
     title: item.title || "操作",
     detail: item.detail || "",
@@ -401,6 +401,20 @@ function addHistory(entry) {
   state.history = [{ id: crypto.randomUUID(), ...entry }, ...state.history].slice(0, 12);
 }
 
+function historyDeltaSeconds(item) {
+  if (item.type === "usage") {
+    const seconds = Number(item.seconds || Math.abs(item.minutes || 0) * 60);
+    return -Math.max(0, seconds);
+  }
+  return Number(item.minutes || 0) * 60;
+}
+
+function formatSignedDuration(seconds) {
+  const value = Number(seconds) || 0;
+  if (value === 0) return "0分";
+  return `${value > 0 ? "+" : "-"}${formatDuration(Math.abs(value))}`;
+}
+
 function formatDuration(seconds) {
   const value = Math.max(0, Number(seconds) || 0);
   const minutes = Math.floor(value / 60);
@@ -412,6 +426,139 @@ function formatDuration(seconds) {
 
 function icon(name) {
   return `<i data-lucide="${name}"></i>`;
+}
+
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function sameLocalDay(left, right) {
+  return (
+    left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate()
+  );
+}
+
+function dayLabel(date, today = new Date()) {
+  if (sameLocalDay(date, today)) return "今日";
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function dateKey(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function historyEvents(parentHistory = [], usageHistory = []) {
+  const parentEvents = parentHistory.map((item, index) => ({
+    ...item,
+    deltaSeconds: historyDeltaSeconds(item),
+    sortKey: Number(item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
+  }));
+  const usageEvents = usageHistory.map((item, index) => ({
+    ...item,
+    deltaSeconds: historyDeltaSeconds(item),
+    sortKey: Number(item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
+  }));
+  return [...parentEvents, ...usageEvents]
+    .filter((item) => item.deltaSeconds !== 0)
+    .sort((a, b) => b.sortKey - a.sortKey);
+}
+
+function historyChartDays(parentHistory = [], usageHistory = []) {
+  const today = startOfLocalDay(new Date());
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    return {
+      key: dateKey(date),
+      date,
+      label: dayLabel(date),
+      addedSeconds: 0,
+      usedSeconds: 0,
+    };
+  });
+  const dayByKey = new Map(days.map((day) => [day.key, day]));
+  const since = days[0].date.getTime();
+  const until = new Date(today);
+  until.setDate(today.getDate() + 1);
+
+  historyEvents(parentHistory, usageHistory).forEach((item) => {
+    const itemDate = new Date(Number(item.sortKey) * 1000);
+    if (itemDate.getTime() < since || itemDate.getTime() >= until.getTime()) return;
+    const key = dateKey(startOfLocalDay(itemDate));
+    const day = dayByKey.get(key);
+    if (!day) return;
+    if (item.deltaSeconds > 0) {
+      day.addedSeconds += item.deltaSeconds;
+    } else {
+      day.usedSeconds += Math.abs(item.deltaSeconds);
+    }
+  });
+
+  return days.map((day) => ({
+    ...day,
+    netSeconds: day.addedSeconds - day.usedSeconds,
+  }));
+}
+
+function renderHistoryGraph(parentHistory, usageHistory) {
+  const days = historyChartDays(parentHistory, usageHistory);
+  const recentEvents = historyEvents(parentHistory, usageHistory)
+    .filter((item) => {
+      const eventDate = new Date(Number(item.sortKey) * 1000);
+      const firstDay = days[0].date.getTime();
+      const nextDay = new Date(days[6].date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      return eventDate.getTime() >= firstDay && eventDate.getTime() < nextDay.getTime();
+    });
+  if (!days.some((day) => day.addedSeconds || day.usedSeconds)) {
+    return renderHistoryEmpty("増減履歴はまだありません");
+  }
+
+  const addedSeconds = days.reduce((sum, day) => sum + day.addedSeconds, 0);
+  const usedSeconds = days.reduce((sum, day) => sum + day.usedSeconds, 0);
+  const netSeconds = addedSeconds - usedSeconds;
+  const maxSeconds = Math.max(...days.flatMap((day) => [day.addedSeconds, day.usedSeconds]), 60);
+
+  return `
+    <div class="history-chart" aria-label="過去1週間の時間増減">
+      <div class="chart-head">
+        <div>
+          <h3>過去1週間の増減</h3>
+          <p>追加 +${formatDuration(addedSeconds)} / 消化 -${formatDuration(usedSeconds)}</p>
+        </div>
+        <span class="chart-net ${netSeconds < 0 ? "negative" : ""}">${formatSignedDuration(netSeconds)}</span>
+      </div>
+      <div class="bar-chart">
+        ${days.map((day) => renderHistoryDayBar(day, maxSeconds)).join("")}
+      </div>
+    </div>
+    <div class="history-list compact-history-list">
+      ${recentEvents.slice(0, 5).map(renderHistoryRow).join("")}
+    </div>
+  `;
+}
+
+function renderHistoryDayBar(day, maxSeconds) {
+  const positiveHeight = Math.max(0, Math.round((day.addedSeconds / maxSeconds) * 48));
+  const negativeHeight = Math.max(0, Math.round((day.usedSeconds / maxSeconds) * 48));
+  const title = `${day.label} 追加 +${formatDuration(day.addedSeconds)} / 消化 -${formatDuration(day.usedSeconds)}`;
+  return `
+    <div class="bar-slot" title="${title}">
+      <div class="bar-half top">
+        ${positiveHeight ? `<span class="chart-bar positive" style="height:${Math.max(8, positiveHeight)}px"></span>` : ""}
+      </div>
+      <span class="bar-zero" aria-hidden="true"></span>
+      <div class="bar-half bottom">
+        ${negativeHeight ? `<span class="chart-bar negative" style="height:${Math.max(8, negativeHeight)}px"></span>` : ""}
+      </div>
+      <strong class="${day.netSeconds < 0 ? "negative" : ""}">${formatSignedDuration(day.netSeconds)}</strong>
+      <small>${day.label}</small>
+    </div>
+  `;
 }
 
 function renderLogin() {
@@ -551,20 +698,7 @@ function render() {
         </span>
       </button>
       ${historyExpanded ? `
-        <div class="history-groups">
-          <div class="history-group">
-            <h3 class="history-group-title">追加・操作</h3>
-            <div class="history-list">
-              ${parentHistory.length ? parentHistory.slice(0, 5).map(renderHistoryRow).join("") : renderHistoryEmpty("追加履歴はまだありません")}
-            </div>
-          </div>
-          <div class="history-group">
-            <h3 class="history-group-title">時間消化</h3>
-            <div class="history-list">
-              ${usageHistory.length ? usageHistory.slice(0, 8).map(renderHistoryRow).join("") : renderHistoryEmpty("消化履歴はまだありません")}
-            </div>
-          </div>
-        </div>
+        ${renderHistoryGraph(parentHistory, usageHistory)}
         <p class="timezone-note">すべての時刻は端末のタイムゾーンで表示されています。</p>
       ` : ""}
     </section>
