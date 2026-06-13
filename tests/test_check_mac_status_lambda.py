@@ -65,6 +65,8 @@ class FakeTable:
             item["LastParentActionBy"] = ExpressionAttributeValues[":parentEmail"]
         if ":parentHistoryJson" in ExpressionAttributeValues:
             item["ParentHistoryJson"] = ExpressionAttributeValues[":parentHistoryJson"]
+        if ":usageHistoryJson" in ExpressionAttributeValues:
+            item["UsageHistoryJson"] = ExpressionAttributeValues[":usageHistoryJson"]
         if ":rewardRulesJson" in ExpressionAttributeValues:
             item["RewardRulesJson"] = ExpressionAttributeValues[":rewardRulesJson"]
         self.updates.append((Key, ExpressionAttributeValues))
@@ -180,6 +182,19 @@ class CheckMacStatusLambdaTests(unittest.TestCase):
         self.assertEqual(body["decision"], "allow")
         self.assertEqual(body["remainingSeconds"], 60)
 
+    def test_allow_records_usage_history(self):
+        result = self.module.handler(event(self.module, usage_delta=60), None)
+        body = self.response_body(result)
+        saved = self.tables["control"].items[(("UserId", "child-001"),)]
+        usage_history = json.loads(saved["UsageHistoryJson"])
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(body["remainingSeconds"], 60)
+        self.assertEqual(usage_history[0]["type"], "usage")
+        self.assertEqual(usage_history[0]["seconds"], 60)
+        self.assertEqual(usage_history[0]["minutes"], -1)
+        self.assertEqual(usage_history[0]["remainingSeconds"], 60)
+
     def test_time_exhausted_denies(self):
         result = self.module.handler(event(self.module, usage_delta=120), None)
         body = self.response_body(result)
@@ -188,6 +203,19 @@ class CheckMacStatusLambdaTests(unittest.TestCase):
         self.assertEqual(body["decision"], "deny")
         self.assertEqual(body["reason"], "time_exhausted")
         self.assertEqual(body["remainingSeconds"], 0)
+
+    def test_usage_history_uses_actual_consumed_seconds(self):
+        self.tables["control"].items[(("UserId", "child-001"),)]["RemainingSeconds"] = 30
+        result = self.module.handler(event(self.module, usage_delta=60), None)
+        body = self.response_body(result)
+        saved = self.tables["control"].items[(("UserId", "child-001"),)]
+        usage_history = json.loads(saved["UsageHistoryJson"])
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(body["decision"], "deny")
+        self.assertEqual(body["remainingSeconds"], 0)
+        self.assertEqual(usage_history[0]["seconds"], 30)
+        self.assertEqual(usage_history[0]["detail"], "30秒を消化")
 
     def test_invalid_signature_rejected(self):
         bad_event = event(self.module, secret="wrong")
@@ -232,6 +260,24 @@ class CheckMacStatusLambdaTests(unittest.TestCase):
         self.assertTrue(body["isApproved"])
         self.assertEqual(body["history"][0]["title"], "計算ドリル 3ページ")
         self.assertEqual(body["history"][0]["minutes"], 15)
+
+    def test_parent_status_returns_usage_history(self):
+        self.tables["control"].items[(("UserId", "child-001"),)]["UsageHistoryJson"] = json.dumps([
+            {
+                "at": 1760000000,
+                "title": "Mac利用",
+                "detail": "1分を消化",
+                "minutes": -1,
+                "seconds": 60,
+                "type": "usage",
+            }
+        ])
+        result = self.module.handler(parent_event("/v1/parent/status"), None)
+        body = self.response_body(result)
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(body["usageHistory"][0]["type"], "usage")
+        self.assertEqual(body["usageHistory"][0]["seconds"], 60)
 
     def test_parent_reward_rules_are_saved(self):
         rules = [

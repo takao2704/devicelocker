@@ -23,6 +23,8 @@ DEFAULT_CHECK_PATH = "/v1/check"
 DEFAULT_TIMEOUT_SECONDS = 5
 DEFAULT_GRACE_PERIOD_SECONDS = 60
 DEFAULT_MAX_USAGE_DELTA_SECONDS = 120
+DEFAULT_CHECK_INTERVAL_SECONDS = 60
+DEFAULT_EXHAUSTED_CHECK_INTERVAL_SECONDS = 10
 
 
 class ConfigError(Exception):
@@ -70,6 +72,8 @@ def load_config(path):
     config.setdefault("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
     config.setdefault("grace_period_seconds", DEFAULT_GRACE_PERIOD_SECONDS)
     config.setdefault("max_usage_delta_seconds", DEFAULT_MAX_USAGE_DELTA_SECONDS)
+    config.setdefault("check_interval_seconds", DEFAULT_CHECK_INTERVAL_SECONDS)
+    config.setdefault("exhausted_check_interval_seconds", DEFAULT_EXHAUSTED_CHECK_INTERVAL_SECONDS)
     return config
 
 
@@ -206,6 +210,7 @@ def state_from_response(response, state, now, grace_period):
     updated = dict(state)
     updated["last_success_at"] = server_time
     updated["last_success_local_at"] = now
+    updated["last_api_check_local_at"] = now
     updated["last_server_time"] = server_time
     updated["last_decision"] = response.get("decision")
     updated["remaining_seconds"] = int(response.get("remainingSeconds") or 0)
@@ -224,6 +229,41 @@ def within_grace(state, now, grace_period):
     if not isinstance(last, (int, float)):
         return False
     return now <= int(last) + int(grace_period)
+
+
+def positive_int(value, default):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = int(default)
+    return max(1, parsed)
+
+
+def is_exhausted_state(state):
+    if str(state.get("last_decision", "")).lower() == "deny":
+        return True
+    if "remaining_seconds" not in state:
+        return False
+    try:
+        return int(state["remaining_seconds"]) <= 0
+    except (TypeError, ValueError):
+        return False
+
+
+def current_check_interval(config, state):
+    if is_exhausted_state(state):
+        return positive_int(
+            config.get("exhausted_check_interval_seconds"),
+            DEFAULT_EXHAUSTED_CHECK_INTERVAL_SECONDS,
+        )
+    return positive_int(config.get("check_interval_seconds"), DEFAULT_CHECK_INTERVAL_SECONDS)
+
+
+def should_call_api(config, state, now):
+    last = state.get("last_success_local_at")
+    if not isinstance(last, (int, float)):
+        return True
+    return now - int(last) >= current_check_interval(config, state)
 
 
 def main(argv):
@@ -258,6 +298,9 @@ def main(argv):
         }
         run_lock(fallback, {}, now)
         return 3
+
+    if not should_call_api(config, state, now):
+        return 0
 
     try:
         request_body = build_request(config, token, state, now)

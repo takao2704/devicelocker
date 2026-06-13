@@ -66,6 +66,7 @@ button {
 .top-actions,
 .sync-button,
 .section-title > div,
+.section-title > span,
 .text-button,
 .primary,
 .secondary,
@@ -299,7 +300,8 @@ h1 {
   margin-bottom: 11px;
 }
 
-.section-title > div {
+.section-title > div,
+.section-title > span {
   gap: 9px;
   min-width: 0;
 }
@@ -322,6 +324,19 @@ h1 {
   color: var(--blue);
   font-weight: 700;
   font-size: 13px;
+}
+
+.history-toggle {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.history-toggle-label {
+  color: var(--blue);
 }
 
 .rule-list {
@@ -439,63 +454,8 @@ h1 {
   line-height: 1;
 }
 
-.quick-quantities {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.quick-quantities button {
-  min-height: 39px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text);
-  font-weight: 800;
-}
-
-.quick-quantities button.active {
-  border-color: var(--teal);
-  background: linear-gradient(180deg, #0b9aa7, #078293);
-  color: #fff;
-}
-
 .compact-title {
   margin-bottom: 12px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 14px;
-}
-
-.summary-grid div {
-  display: grid;
-  gap: 7px;
-  min-height: 64px;
-  padding: 10px 8px;
-  text-align: center;
-  border-right: 1px solid var(--line);
-}
-
-.summary-grid div:last-child {
-  border-right: 0;
-}
-
-.summary-grid span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.summary-grid strong {
-  color: var(--teal);
-  font-size: 20px;
-  line-height: 1.05;
 }
 
 .primary,
@@ -566,6 +526,18 @@ h1 {
   display: grid;
 }
 
+.history-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.history-group-title {
+  margin: 0 0 4px;
+  color: #48566a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .history-row {
   gap: 12px;
   min-height: 63px;
@@ -594,6 +566,10 @@ h1 {
 
 .history-icon.resume {
   background: var(--blue);
+}
+
+.history-icon.usage {
+  background: #506077;
 }
 
 .history-row > div {
@@ -631,6 +607,17 @@ h1 {
   font-size: 14px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.history-minutes.negative {
+  color: #506077;
+}
+
+.history-empty {
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .timezone-note {
@@ -781,7 +768,4 @@ svg {
     text-align: left;
   }
 
-  .quick-quantities {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }

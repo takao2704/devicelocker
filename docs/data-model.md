@@ -24,6 +24,7 @@
 | `DeviceEnabled` | Boolean | 端末が有効かどうか |
 | `RewardRulesJson` | String | 親 Web UI の報酬ルール JSON |
 | `ParentHistoryJson` | String | 親 Web UI の最近の操作履歴 JSON |
+| `UsageHistoryJson` | String | Mac 利用による最近の時間消化履歴 JSON |
 | `LastParentActionAt` | Number | 親 Web UI から最後に操作した時刻 |
 | `LastParentActionBy` | String | 最後に操作した親のメールアドレス |
 
@@ -43,7 +44,9 @@
 ]
 ```
 
-MVP では親 Web UI と CLI の両方が同じ `RemainingSeconds` / `IsApproved` を更新する。報酬ルールと履歴は親 Web UI 専用の補助属性として扱う。
+`UsageHistoryJson` は Mac エージェントの `/v1/check` で実際に `RemainingSeconds` から減算した秒数だけを記録する。残り 30 秒の状態で 60 秒報告された場合、履歴には 30 秒消化として残す。
+
+MVP では親 Web UI と CLI の両方が同じ `RemainingSeconds` / `IsApproved` を更新する。報酬ルール、親操作履歴、時間消化履歴は Web UI 表示用の補助属性として扱う。
 
 ## DynamoDB: DeviceLockerDevices
 
@@ -135,7 +138,9 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "lock_command": "/usr/local/sbin/devicelocker-lock",
   "grace_period_seconds": 60,
   "timeout_seconds": 5,
-  "max_usage_delta_seconds": 120
+  "max_usage_delta_seconds": 120,
+  "check_interval_seconds": 60,
+  "exhausted_check_interval_seconds": 10
 }
 ```
 

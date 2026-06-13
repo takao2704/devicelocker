@@ -34,7 +34,9 @@ cat > "$CONFIG_PATH" <<JSON
   "lock_command": "$LOCK_STUB",
   "grace_period_seconds": 60,
   "timeout_seconds": 2,
-  "max_usage_delta_seconds": 120
+  "max_usage_delta_seconds": 120,
+  "check_interval_seconds": 60,
+  "exhausted_check_interval_seconds": 10
 }
 JSON
 

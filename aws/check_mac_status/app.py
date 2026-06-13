@@ -33,6 +33,7 @@ DEFAULT_PARENT_USER_ID = os.environ.get(
 PARENT_CHILD_NAME = os.environ.get("PARENT_CHILD_NAME", "yuuto")
 MAX_PARENT_ADD_MINUTES = int(os.environ.get("MAX_PARENT_ADD_MINUTES", "360"))
 PARENT_HISTORY_LIMIT = int(os.environ.get("PARENT_HISTORY_LIMIT", "20"))
+PARENT_USAGE_HISTORY_LIMIT = int(os.environ.get("PARENT_USAGE_HISTORY_LIMIT", "30"))
 ONLINE_WINDOW_SECONDS = int(os.environ.get("ONLINE_WINDOW_SECONDS", "180"))
 PARENT_COGNITO_DOMAIN = os.environ.get("PARENT_COGNITO_DOMAIN", "")
 PARENT_USER_POOL_CLIENT_ID = os.environ.get("PARENT_USER_POOL_CLIENT_ID", "")
@@ -239,11 +240,23 @@ def history_from_item(item):
     return history if isinstance(history, list) else []
 
 
+def usage_history_from_item(item):
+    history = parse_json_attr(item.get("UsageHistoryJson") if item else None, [])
+    return history if isinstance(history, list) else []
+
+
 def append_history(item, entry):
     history = history_from_item(item)
     next_history = [{**entry, "id": entry.get("id") or f"{entry.get('at', int(time.time()))}-{entry.get('type', 'event')}"}]
     next_history.extend(history)
     return next_history[:PARENT_HISTORY_LIMIT]
+
+
+def append_usage_history(item, entry):
+    history = usage_history_from_item(item)
+    next_history = [{**entry, "id": entry.get("id") or f"{entry.get('at', int(time.time()))}-{entry.get('type', 'usage')}"}]
+    next_history.extend(history)
+    return next_history[:PARENT_USAGE_HISTORY_LIMIT]
 
 
 def get_control_item(user_id):
@@ -256,6 +269,16 @@ def minutes_from_seconds(seconds):
     if seconds == 0:
         return 0
     return (seconds + 59) // 60
+
+
+def duration_label(seconds):
+    seconds = max(0, int(seconds))
+    minutes, remainder = divmod(seconds, 60)
+    if minutes and remainder:
+        return f"{minutes}分{remainder}秒"
+    if minutes:
+        return f"{minutes}分"
+    return f"{remainder}秒"
 
 
 def normalize_signature(signature):
@@ -405,6 +428,7 @@ def control_status_body(user_id, item, now, parent_email=None):
         "policyVersion": to_int(item.get("PolicyVersion")),
         "rewardRules": reward_rules_from_item(item),
         "history": history_from_item(item)[:PARENT_HISTORY_LIMIT],
+        "usageHistory": usage_history_from_item(item)[:PARENT_USAGE_HISTORY_LIMIT],
         "parentEmail": parent_email,
         "serverTime": now,
     }
@@ -554,6 +578,7 @@ def decide_and_update(user_id, device_id, usage_delta, now):
             "DeviceEnabled": True,
         }
 
+    consumed_seconds = 0
     if not item.get("DeviceEnabled", True):
         decision = "deny"
         reason = "device_disabled"
@@ -563,6 +588,7 @@ def decide_and_update(user_id, device_id, usage_delta, now):
     else:
         remaining_before = to_int(item.get("RemainingSeconds"))
         remaining_after = max(0, remaining_before - usage_delta)
+        consumed_seconds = max(0, remaining_before - remaining_after)
         if remaining_after <= 0:
             decision = "deny"
             reason = "time_exhausted"
@@ -574,23 +600,43 @@ def decide_and_update(user_id, device_id, usage_delta, now):
     policy_version = to_int(item.get("PolicyVersion")) + 1
     remaining = to_int(item.get("RemainingSeconds"))
 
+    update_expression = (
+        "SET DeviceId = :deviceId, RemainingSeconds = :remaining, "
+        "IsApproved = :approved, UpdatedAt = :updatedAt, "
+        "LastUsageReportedAt = :lastUsageReportedAt, PolicyVersion = :policyVersion, "
+        "DeviceEnabled = :deviceEnabled"
+    )
+    expression_values = {
+        ":deviceId": device_id,
+        ":remaining": Decimal(remaining),
+        ":approved": bool(item.get("IsApproved", False)),
+        ":updatedAt": Decimal(now),
+        ":lastUsageReportedAt": Decimal(now),
+        ":policyVersion": Decimal(policy_version),
+        ":deviceEnabled": bool(item.get("DeviceEnabled", True)),
+    }
+    if consumed_seconds > 0:
+        update_expression += ", UsageHistoryJson = :usageHistoryJson"
+        usage_history = append_usage_history(item, {
+            "at": now,
+            "title": "Mac利用",
+            "detail": f"{duration_label(consumed_seconds)}を消化",
+            "minutes": -minutes_from_seconds(consumed_seconds),
+            "seconds": consumed_seconds,
+            "type": "usage",
+            "deviceId": device_id,
+            "remainingSeconds": remaining,
+        })
+        expression_values[":usageHistoryJson"] = json.dumps(
+            usage_history,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
     control_table.update_item(
         Key={"UserId": user_id},
-        UpdateExpression=(
-            "SET DeviceId = :deviceId, RemainingSeconds = :remaining, "
-            "IsApproved = :approved, UpdatedAt = :updatedAt, "
-            "LastUsageReportedAt = :lastUsageReportedAt, PolicyVersion = :policyVersion, "
-            "DeviceEnabled = :deviceEnabled"
-        ),
-        ExpressionAttributeValues={
-            ":deviceId": device_id,
-            ":remaining": Decimal(remaining),
-            ":approved": bool(item.get("IsApproved", False)),
-            ":updatedAt": Decimal(now),
-            ":lastUsageReportedAt": Decimal(now),
-            ":policyVersion": Decimal(policy_version),
-            ":deviceEnabled": bool(item.get("DeviceEnabled", True)),
-        },
+        UpdateExpression=update_expression,
+        ExpressionAttributeValues=expression_values,
     )
 
     return {

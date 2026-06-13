@@ -46,7 +46,14 @@ class DeviceLockerCheckTests(unittest.TestCase):
             "lock_command": str(self.lock_path),
             "grace_period_seconds": 60,
             "timeout_seconds": 1,
+            "check_interval_seconds": 60,
+            "exhausted_check_interval_seconds": 10,
         }), encoding="utf-8")
+
+    def update_config(self, **updates):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config.update(updates)
+        self.config_path.write_text(json.dumps(config), encoding="utf-8")
 
     def read_state(self):
         return json.loads(self.state_path.read_text(encoding="utf-8"))
@@ -69,6 +76,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
         self.assertEqual(state["remaining_seconds"], 1200)
         self.assertEqual(state["last_success_at"], 1000)
         self.assertEqual(state["last_success_local_at"], 2000)
+        self.assertEqual(state["last_api_check_local_at"], 2000)
         self.assertEqual(state["usage_baseline_local_at"], 2000)
 
     def test_skips_when_console_user_is_not_monitored_user(self):
@@ -139,6 +147,49 @@ class DeviceLockerCheckTests(unittest.TestCase):
 
         self.assertEqual(body["usageDeltaSeconds"], 10)
 
+    def test_skips_api_before_normal_check_interval(self):
+        self.state_path.write_text(json.dumps({
+            "last_decision": "allow",
+            "last_success_local_at": 1990,
+            "remaining_seconds": 1200,
+            "usage_baseline_local_at": 1990,
+        }), encoding="utf-8")
+
+        with mock.patch.object(self.module, "post_check") as post_check, \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        post_check.assert_not_called()
+        run.assert_not_called()
+
+    def test_exhausted_state_uses_short_check_interval(self):
+        self.state_path.write_text(json.dumps({
+            "last_decision": "deny",
+            "last_success_local_at": 1990,
+            "remaining_seconds": 0,
+            "usage_baseline_local_at": 1990,
+            "locked_at": 1990,
+        }), encoding="utf-8")
+        response = {
+            "decision": "deny",
+            "remainingSeconds": 0,
+            "serverTime": 1000,
+        }
+
+        with mock.patch.object(self.module, "post_check", return_value=response) as post_check, \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 2)
+        post_check.assert_called_once()
+        self.assertEqual(post_check.call_args.args[1]["usageDeltaSeconds"], 10)
+        run.assert_called_once_with([str(self.lock_path)], check=False)
+
     def test_deny_runs_lock(self):
         response = {
             "decision": "deny",
@@ -156,6 +207,7 @@ class DeviceLockerCheckTests(unittest.TestCase):
         self.assertEqual(self.read_state()["locked_at"], 2000)
 
     def test_api_failure_within_grace_does_not_lock(self):
+        self.update_config(check_interval_seconds=1)
         self.state_path.write_text(json.dumps({"last_success_local_at": 1990}), encoding="utf-8")
         with mock.patch.object(self.module, "post_check", side_effect=self.module.ApiError("offline")), \
              mock.patch.object(self.module, "is_screen_locked", return_value=False), \

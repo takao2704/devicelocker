@@ -6,7 +6,7 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 
 ## 現在できること
 
-- Mac が 60 秒ごとに AWS の `POST /v1/check` を確認する。
+- Mac は 10 秒ごとに軽く起動し、通常時は 60 秒ごと、残り時間ゼロまたは deny 状態では 10 秒ごとに AWS の `POST /v1/check` を確認する。
 - AWS 側の `RemainingSeconds` が利用時間に応じて減る。
 - `RemainingSeconds=0` で Mac がロックされる。
 - `monitored_user_name` に設定した子どもアカウントが前面のときだけ利用時間を消費し、ロック対象にする。
@@ -120,6 +120,8 @@ sudo scripts/start-agent.sh
 ```sh
 tail -n 0 -f /var/log/devicelocker.err
 ```
+
+`/var/log/devicelocker.log` と `/var/log/devicelocker.err` は `newsyslog` で 1MB ごとに gzip 圧縮し、7 世代保持する。
 
 停止する。
 

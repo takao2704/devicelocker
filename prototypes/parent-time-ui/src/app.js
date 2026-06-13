@@ -24,7 +24,6 @@ const defaultState = {
       unitName: "ページ",
       minutesPerUnit: 5,
       allowQuantity: true,
-      quickQuantities: [1, 2, 3, 5],
       icon: "book-open",
     },
     {
@@ -33,7 +32,6 @@ const defaultState = {
       unitName: "問",
       minutesPerUnit: 10,
       allowQuantity: true,
-      quickQuantities: [1, 2, 3],
       icon: "file-pen-line",
     },
     {
@@ -42,7 +40,6 @@ const defaultState = {
       unitName: "回",
       minutesPerUnit: 10,
       allowQuantity: false,
-      quickQuantities: [1],
       icon: "circle-check",
     },
   ],
@@ -52,6 +49,10 @@ const defaultState = {
     { id: "h3", time: "今日 20:15", title: "一時停止", detail: "残り 42分", minutes: 0, type: "pause" },
     { id: "h4", time: "今日 19:12", title: "丸つけ完了", detail: "+10分を追加", minutes: 10, type: "add" },
   ],
+  usageHistory: [
+    { id: "u1", time: "今日 21:08", title: "Mac利用", detail: "1分を消化", minutes: -1, seconds: 60, type: "usage" },
+    { id: "u2", time: "今日 21:07", title: "Mac利用", detail: "1分を消化", minutes: -1, seconds: 60, type: "usage" },
+  ],
 };
 
 let state = loadState();
@@ -59,6 +60,7 @@ let authState = loadAuthState();
 let editingRuleId = null;
 let remoteError = "";
 let isBusy = false;
+let historyExpanded = false;
 
 const app = document.querySelector("#app");
 const ruleModal = document.querySelector("#ruleModal");
@@ -311,10 +313,12 @@ function formatHistoryTime(at) {
 function normalizeHistory(items = []) {
   return items.map((item) => ({
     id: item.id || crypto.randomUUID(),
+    at: Number(item.at || 0),
     time: item.time || formatHistoryTime(item.at),
     title: item.title || "操作",
     detail: item.detail || "",
     minutes: Number(item.minutes || 0),
+    seconds: Number(item.seconds || 0),
     type: item.type || "add",
   }));
 }
@@ -330,6 +334,7 @@ function applyRemoteStatus(data) {
     lastSyncedAt: syncTime(),
     rules: Array.isArray(data.rewardRules) && data.rewardRules.length ? data.rewardRules : state.rules,
     history: normalizeHistory(data.history || state.history),
+    usageHistory: normalizeHistory(data.usageHistory || []),
   };
   if (!state.rules.some((rule) => rule.id === state.selectedRuleId)) {
     state.selectedRuleId = state.rules[0]?.id;
@@ -396,6 +401,15 @@ function addHistory(entry) {
   state.history = [{ id: crypto.randomUUID(), ...entry }, ...state.history].slice(0, 12);
 }
 
+function formatDuration(seconds) {
+  const value = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  if (minutes && remainder) return `${minutes}分${remainder}秒`;
+  if (minutes) return `${minutes}分`;
+  return `${remainder}秒`;
+}
+
 function icon(name) {
   return `<i data-lucide="${name}"></i>`;
 }
@@ -434,9 +448,10 @@ function render() {
   const rule = selectedRule();
   const quantity = currentQuantity(rule);
   const minutes = rewardMinutes(rule);
-  const projected = state.remainingMinutes + minutes;
   const limitProgress = Math.min(100, Math.round((state.remainingMinutes / state.dailyLimitMinutes) * 100));
   const isPaused = state.status === "停止中";
+  const parentHistory = Array.isArray(state.history) ? state.history : [];
+  const usageHistory = Array.isArray(state.usageHistory) ? state.usageHistory : [];
 
   app.innerHTML = `
     <header class="topbar">
@@ -495,26 +510,6 @@ function render() {
     </section>
 
     <section class="section confirmation">
-      <div class="section-title compact-title">
-        <div>
-          ${icon("bar-chart-3")}
-          <h2>追加内容の確認</h2>
-        </div>
-      </div>
-      <div class="summary-grid">
-        <div>
-          <span>内訳</span>
-          <strong>${rule.allowQuantity ? `${quantity}${rule.unitName} × ${rule.minutesPerUnit}分` : `${rule.name}`}</strong>
-        </div>
-        <div>
-          <span>追加する時間</span>
-          <strong>+${minutes}分</strong>
-        </div>
-        <div>
-          <span>追加後</span>
-          <strong>${projected}分</strong>
-        </div>
-      </div>
       <button class="primary" type="button" data-action="add-time" ${isBusy ? "disabled" : ""}>
         ${icon("clock-plus")}
         ${rule.allowQuantity ? `${quantity}${rule.unitName}分を追加` : `${rule.name}で追加`}（+${minutes}分）
@@ -546,17 +541,32 @@ function render() {
     </section>
 
     <section class="section history">
-      <div class="section-title">
-        <div>
+      <button class="section-title history-toggle" type="button" data-action="toggle-history" aria-expanded="${historyExpanded ? "true" : "false"}">
+        <span>
           ${icon("history")}
           <h2>最近の履歴</h2>
+        </span>
+        <span class="text-button history-toggle-label">
+          ${historyExpanded ? "閉じる" : "開く"} ${icon(historyExpanded ? "chevron-up" : "chevron-down")}
+        </span>
+      </button>
+      ${historyExpanded ? `
+        <div class="history-groups">
+          <div class="history-group">
+            <h3 class="history-group-title">追加・操作</h3>
+            <div class="history-list">
+              ${parentHistory.length ? parentHistory.slice(0, 5).map(renderHistoryRow).join("") : renderHistoryEmpty("追加履歴はまだありません")}
+            </div>
+          </div>
+          <div class="history-group">
+            <h3 class="history-group-title">時間消化</h3>
+            <div class="history-list">
+              ${usageHistory.length ? usageHistory.slice(0, 8).map(renderHistoryRow).join("") : renderHistoryEmpty("消化履歴はまだありません")}
+            </div>
+          </div>
         </div>
-        <button class="text-button" type="button">すべて見る ${icon("chevron-right")}</button>
-      </div>
-      <div class="history-list">
-        ${state.history.slice(0, 5).map(renderHistoryRow).join("")}
-      </div>
-      <p class="timezone-note">すべての時刻は端末のタイムゾーンで表示されています。</p>
+        <p class="timezone-note">すべての時刻は端末のタイムゾーンで表示されています。</p>
+      ` : ""}
     </section>
   `;
 
@@ -590,7 +600,6 @@ function renderRuleRow(rule) {
 }
 
 function renderQuantity(rule, quantity) {
-  const quicks = Array.from(new Set([...(rule.quickQuantities || []), quantity])).sort((a, b) => a - b);
   return `
     <div class="quantity-panel">
       <div class="stepper-line">
@@ -601,19 +610,19 @@ function renderQuantity(rule, quantity) {
           <button type="button" data-action="quantity-plus" aria-label="増やす">${icon("plus")}</button>
         </div>
       </div>
-      <div class="quick-quantities" aria-label="よく使う数">
-        ${quicks.map((value) => `
-          <button type="button" class="${value === quantity ? "active" : ""}" data-action="quantity-set" data-quantity="${value}">
-            ${value}${rule.unitName}
-          </button>
-        `).join("")}
-      </div>
     </div>
   `;
 }
 
 function renderHistoryRow(item) {
-  const iconName = item.type === "pause" ? "pause" : item.type === "resume" ? "play" : "plus";
+  const iconName = item.type === "pause" ? "pause" : item.type === "resume" ? "play" : item.type === "usage" ? "timer" : "plus";
+  const amount = item.type === "usage" && item.seconds > 0
+    ? `-${formatDuration(item.seconds)}`
+    : item.minutes > 0
+      ? `+${item.minutes}分`
+      : item.minutes < 0
+        ? `${item.minutes}分`
+        : "";
   return `
     <div class="history-row">
       <span class="history-icon ${item.type}">${icon(iconName)}</span>
@@ -622,9 +631,13 @@ function renderHistoryRow(item) {
         <span>${item.title}</span>
         <small>${item.detail}</small>
       </div>
-      <span class="history-minutes">${item.minutes > 0 ? `+${item.minutes}分` : ""}</span>
+      <span class="history-minutes ${item.type === "usage" ? "negative" : ""}">${amount}</span>
     </div>
   `;
+}
+
+function renderHistoryEmpty(text) {
+  return `<p class="history-empty">${text}</p>`;
 }
 
 function persistAndRender() {
@@ -666,11 +679,6 @@ async function handleAction(event) {
 
   if (action === "quantity-plus") {
     state.quantity = Math.min(99, currentQuantity(rule) + 1);
-    persistAndRender();
-  }
-
-  if (action === "quantity-set") {
-    state.quantity = Number(control.dataset.quantity);
     persistAndRender();
   }
 
@@ -739,6 +747,11 @@ async function handleAction(event) {
     persistAndRender();
   }
 
+  if (action === "toggle-history") {
+    historyExpanded = !historyExpanded;
+    render();
+  }
+
   if (action === "edit-rule") {
     openRuleModal(control.dataset.ruleId);
   }
@@ -794,7 +807,6 @@ async function handleRuleSubmit(event) {
     unitName: String(formData.get("unitName") || "回").trim(),
     minutesPerUnit: minutes,
     allowQuantity: formData.get("allowQuantity") === "on",
-    quickQuantities: previous?.quickQuantities || [1, 2, 3, 5],
     icon: previous?.icon || "book-open",
   };
 

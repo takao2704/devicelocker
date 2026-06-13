@@ -30,7 +30,8 @@
 ```text
 [Child MacBook]
   LaunchDaemon
-    - 60 秒ごとにチェック処理を起動
+    - 10 秒ごとにチェック処理を起動
+    - 通常時は 60 秒ごと、残り時間ゼロまたは deny 状態は 10 秒ごとに AWS 確認
     - API 判定結果を state.json に保存
     - deny または猶予超過でロックを実行
 
@@ -59,7 +60,8 @@
 
 ### Mac エージェント
 
-- root 所有の LaunchDaemon から 60 秒ごとに起動する。
+- root 所有の LaunchDaemon から 10 秒ごとに起動する。
+- 通常時の AWS チェックは 60 秒ごとに抑制し、残り時間ゼロまたは deny 状態では 10 秒ごとに確認する。
 - API に `userId`, `deviceId`, `timestamp`, `nonce`, `signature` を送る。
 - API 応答が `allow` の場合はローカル状態を更新し、利用時間を消費する。
 - API 応答が `deny` の場合はローカル状態を更新してロックする。
@@ -94,7 +96,7 @@
 | 項目 | 判断 |
 | --- | --- |
 | 実行方式 | LaunchDaemon による短時間実行 |
-| 判定間隔 | 60 秒 |
+| 判定間隔 | 通常 60 秒、残り時間ゼロまたは deny 状態は 10 秒 |
 | オフライン猶予 | 初期値 1 分 |
 | 許可モデル | 残り利用可能時間のチャージ・消費 |
 | API 認証 | device token + HMAC |

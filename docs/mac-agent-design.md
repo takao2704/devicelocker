@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | LaunchDaemon | `/Library/LaunchDaemons/com.devicelocker.agent.plist` | `root:wheel` | `644` |
 | 実行ファイル | `/usr/local/sbin/devicelocker-check` | `root:wheel` | `750` |
+| ログローテーション設定 | `/etc/newsyslog.d/com.devicelocker.conf` | `root:wheel` | `644` |
 | 設定ディレクトリ | `/Library/Application Support/DeviceLocker` | `root:wheel` | `750` |
 | 状態ディレクトリ | `/var/db/devicelocker` | `root:wheel` | `750` |
 | 状態ファイル | `/var/db/devicelocker/state.json` | `root:wheel` | `600` |
@@ -25,7 +26,7 @@
     <string>/usr/local/sbin/devicelocker-check</string>
   </array>
   <key>StartInterval</key>
-  <integer>60</integer>
+  <integer>10</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>StandardOutPath</key>
@@ -101,6 +102,11 @@ screen locked?
 load token/state
   |
   v
+API check interval reached?
+  |
+  +-- no --> exit
+  |
+  v
 call CheckMacStatus
   |
   +-- success + allow --> update remaining time/state --> exit
@@ -136,7 +142,11 @@ call CheckMacStatus
 
 ## 利用時間の消費
 
-- MVP では LaunchDaemon の実行間隔を利用し、前回成功から今回成功までの経過秒数を `usageDeltaSeconds` として API に報告する。
+- API チェック時は、前回成功から今回成功までの経過秒数を `usageDeltaSeconds` として API に報告する。
+- LaunchDaemon は 10 秒ごとに起動するが、通常時の API チェックは `check_interval_seconds` の初期値 60 秒ごとに抑制する。
+- ローカル状態が `remaining_seconds <= 0` または `last_decision=deny` の場合は `exhausted_check_interval_seconds` の初期値 10 秒ごとに API チェックする。
+- 残り時間ゼロでロックされた後、子どもが再ログインしても、AWS 側の残り時間がゼロのままなら最大 10 秒程度で再ロックされる。
+- ロック中に親が時間を追加した場合は、次の 10 秒チェックで `allow` に戻り、通常の 60 秒チェックに戻る。
 - `monitored_user_name` が設定されている場合は、対象ユーザーが前面のコンソールユーザーのときだけ `usageDeltaSeconds` を報告する。
 - 画面ロック中は `usageDeltaSeconds` を報告しない。
 - サーバーは報告された `usageDeltaSeconds` を残り時間から減算する。
@@ -192,6 +202,8 @@ root LaunchDaemon 経由の検証には、一時的に `launchd/com.devicelocker
 ## ログ
 
 `/var/log/devicelocker.err` に時刻付きで判定結果を出力する。
+`/var/log/devicelocker.log` と `/var/log/devicelocker.err` は macOS 標準の `newsyslog` でローテーションする。
+各ログは 1MB 到達時に gzip 圧縮でローテーションし、7 世代保持する。
 
 例:
 

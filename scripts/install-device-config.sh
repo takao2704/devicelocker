@@ -14,6 +14,8 @@ CHECK_PATH="${CHECK_PATH:-/v1/check}"
 GRACE_PERIOD_SECONDS="${GRACE_PERIOD_SECONDS:-60}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-5}"
 MAX_USAGE_DELTA_SECONDS="${MAX_USAGE_DELTA_SECONDS:-120}"
+CHECK_INTERVAL_SECONDS="${CHECK_INTERVAL_SECONDS:-60}"
+EXHAUSTED_CHECK_INTERVAL_SECONDS="${EXHAUSTED_CHECK_INTERVAL_SECONDS:-10}"
 LOCK_COMMAND="${LOCK_COMMAND:-/usr/local/sbin/devicelocker-lock}"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -50,7 +52,9 @@ cat > "$CONFIG_PATH" <<JSON
   "lock_command": "$LOCK_COMMAND",
   "grace_period_seconds": $GRACE_PERIOD_SECONDS,
   "timeout_seconds": $TIMEOUT_SECONDS,
-  "max_usage_delta_seconds": $MAX_USAGE_DELTA_SECONDS
+  "max_usage_delta_seconds": $MAX_USAGE_DELTA_SECONDS,
+  "check_interval_seconds": $CHECK_INTERVAL_SECONDS,
+  "exhausted_check_interval_seconds": $EXHAUSTED_CHECK_INTERVAL_SECONDS
 }
 JSON
 

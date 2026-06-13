@@ -159,7 +159,9 @@ Mac 側の `config.json` 例:
   "lock_command": "/usr/local/sbin/devicelocker-lock",
   "grace_period_seconds": 60,
   "timeout_seconds": 5,
-  "max_usage_delta_seconds": 120
+  "max_usage_delta_seconds": 120,
+  "check_interval_seconds": 60,
+  "exhausted_check_interval_seconds": 10
 }
 ```
 

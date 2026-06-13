@@ -168,6 +168,7 @@
             "PARENT_CHILD_NAME": { "Ref": "ParentChildName" },
             "MAX_PARENT_ADD_MINUTES": "360",
             "PARENT_HISTORY_LIMIT": "20",
+            "PARENT_USAGE_HISTORY_LIMIT": "30",
             "ONLINE_WINDOW_SECONDS": "180",
             "PARENT_COGNITO_DOMAIN": {
               "Fn::If": [
