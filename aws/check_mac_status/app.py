@@ -34,6 +34,9 @@ PARENT_CHILD_NAME = os.environ.get("PARENT_CHILD_NAME", "yuuto")
 MAX_PARENT_ADD_MINUTES = int(os.environ.get("MAX_PARENT_ADD_MINUTES", "360"))
 PARENT_HISTORY_LIMIT = int(os.environ.get("PARENT_HISTORY_LIMIT", "20"))
 ONLINE_WINDOW_SECONDS = int(os.environ.get("ONLINE_WINDOW_SECONDS", "180"))
+PARENT_COGNITO_DOMAIN = os.environ.get("PARENT_COGNITO_DOMAIN", "")
+PARENT_USER_POOL_CLIENT_ID = os.environ.get("PARENT_USER_POOL_CLIENT_ID", "")
+PARENT_UI_PATH = os.environ.get("PARENT_UI_PATH", "/parent-ui")
 DEFAULT_REWARD_RULES = [
     {
         "id": "calc-drill",
@@ -83,6 +86,41 @@ def response(status_code, body):
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body, ensure_ascii=False, separators=(",", ":")),
     }
+
+
+def html_response(status_code, html):
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+        },
+        "body": html,
+    }
+
+
+def request_origin(event):
+    headers = event.get("headers") or {}
+    host = headers.get("host") or headers.get("Host")
+    proto = headers.get("x-forwarded-proto") or headers.get("X-Forwarded-Proto") or "https"
+    if host:
+        return f"{proto}://{host}"
+    return ""
+
+
+def parent_ui_html(event):
+    path = os.path.join(os.path.dirname(__file__), "parent_ui.html")
+    with open(path, encoding="utf-8") as handle:
+        html = handle.read()
+    origin = request_origin(event)
+    redirect_uri = origin + PARENT_UI_PATH if origin else ""
+    return (
+        html
+        .replace("__PARENT_COGNITO_DOMAIN__", PARENT_COGNITO_DOMAIN)
+        .replace("__PARENT_USER_POOL_CLIENT_ID__", PARENT_USER_POOL_CLIENT_ID)
+        .replace("__PARENT_REDIRECT_URI__", redirect_uri)
+        .replace("__PARENT_LOGOUT_URI__", redirect_uri)
+    )
 
 
 def parse_body(event):
@@ -569,6 +607,8 @@ def handler(event, context):
     now = int(time.time())
     path = get_request_path(event)
     method = get_method(event)
+    if method == "GET" and path.rstrip("/") == PARENT_UI_PATH:
+        return html_response(200, parent_ui_html(event))
     if method == "OPTIONS":
         return response(204, {})
     try:

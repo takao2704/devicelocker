@@ -76,6 +76,18 @@ Amplify Hosting の環境変数には以下を設定する。`amplify.yml` が `
 
 親 Web UI は Cognito の ID token を `Authorization: Bearer ...` として親APIへ送る。API Gateway の JWT authorizer が署名・issuer・audience を検証し、Lambda が `email` claim を `PARENT_ALLOWED_EMAILS` と照合する。
 
+### API Gateway 配信
+
+Amplify Hosting が使えない場合でも、同じ親 Web UI を API Gateway 経由で配信できる。
+
+```text
+https://<api-id>.execute-api.ap-northeast-1.amazonaws.com/parent-ui
+```
+
+`scripts/package-aws.sh` は `prototypes/parent-time-ui` の HTML/CSS/JS を単一の `parent_ui.html` にまとめ、Lambda zip に同梱する。`GET /parent-ui` は認証なしで画面だけを返し、実際の親操作 API `/v1/parent/*` は Cognito JWT authorizer で保護する。
+
+この方式を使う場合は Cognito callback/logout URL に `/parent-ui` のURLを追加する。
+
 ## 初期データ投入
 
 ```sh

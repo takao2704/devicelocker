@@ -168,7 +168,22 @@
             "PARENT_CHILD_NAME": { "Ref": "ParentChildName" },
             "MAX_PARENT_ADD_MINUTES": "360",
             "PARENT_HISTORY_LIMIT": "20",
-            "ONLINE_WINDOW_SECONDS": "180"
+            "ONLINE_WINDOW_SECONDS": "180",
+            "PARENT_COGNITO_DOMAIN": {
+              "Fn::If": [
+                "EnableParentHostedUiDomain",
+                { "Fn::Sub": "https://${ParentAuthDomainPrefix}.auth.${AWS::Region}.amazoncognito.com" },
+                ""
+              ]
+            },
+            "PARENT_USER_POOL_CLIENT_ID": {
+              "Fn::If": [
+                "EnableGoogleProvider",
+                { "Ref": "ParentUserPoolClientWithGoogle" },
+                { "Ref": "ParentUserPoolClientWithoutGoogle" }
+              ]
+            },
+            "PARENT_UI_PATH": "/parent-ui"
           }
         },
         "Code": {
@@ -329,6 +344,14 @@
         "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
       }
     },
+    "ParentUiRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": { "Ref": "HttpApi" },
+        "RouteKey": "GET /parent-ui",
+        "Target": { "Fn::Sub": "integrations/${CheckIntegration}" }
+      }
+    },
     "ParentStatusRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -416,6 +439,17 @@
         "Principal": "apigateway.amazonaws.com",
         "SourceArn": {
           "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/v1/parent/*"
+        }
+      }
+    },
+    "ParentUiLambdaInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": { "Ref": "CheckMacStatusFunction" },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/GET/parent-ui*"
         }
       }
     }

@@ -137,7 +137,7 @@ sudo scripts/uninstall-agent.sh
 
 ### Web UI
 
-スマホ向けの親管理画面は [prototypes/parent-time-ui](prototypes/parent-time-ui) にある。Amplify Hosting + Cognito + Google アカウント認証で使う場合の設定は [docs/aws.md](docs/aws.md) を参照する。
+スマホ向けの親管理画面は [prototypes/parent-time-ui](prototypes/parent-time-ui) にある。デプロイ済み環境では API Gateway の `/parent-ui` から同じ画面を配信する。Amplify Hosting + Cognito + Google アカウント認証で使う場合の設定は [docs/aws.md](docs/aws.md) を参照する。
 
 ### AWS CLI
 
