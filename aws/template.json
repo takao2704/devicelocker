@@ -14,7 +14,7 @@
     },
     "ParentChildName": {
       "Type": "String",
-      "Default": "yuuto",
+      "Default": "child",
       "Description": "Display name returned to the parent web UI."
     },
     "ParentAuthDomainPrefix": {

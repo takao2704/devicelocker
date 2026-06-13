@@ -90,7 +90,7 @@ sudo API_BASE_URL="https://xxxxx.execute-api.ap-northeast-1.amazonaws.com" \
 既存の設定に対象ユーザーだけ追加・変更する場合:
 
 ```sh
-sudo scripts/set-monitored-user.sh yuuto
+sudo scripts/set-monitored-user.sh child
 ```
 
 エージェントをインストールする。
@@ -105,7 +105,7 @@ sudo scripts/install-agent.sh
 sudo /usr/local/sbin/devicelocker-check
 ```
 
-親アカウントのデスクトップで実行した場合は `skip: console_user=takaoide monitored_user=yuuto` が出れば対象ユーザー判定は成功。子どもアカウントが前面で、画面ロックされていない状態では `allow: remaining_seconds=...` が出れば AWS 連携成功。
+親アカウントのデスクトップで実行した場合は `skip: console_user=parent-admin monitored_user=child` が出れば対象ユーザー判定は成功。子どもアカウントが前面で、画面ロックされていない状態では `allow: remaining_seconds=...` が出れば AWS 連携成功。
 
 ## 起動と停止
 

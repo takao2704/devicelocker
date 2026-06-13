@@ -132,7 +132,7 @@ call CheckMacStatus
 - `config.json` の `monitored_user_name` が設定されている場合、`/dev/console` の所有ユーザーが一致するときだけ AWS にチェックを送る。
 - 現在のコンソールユーザーが対象外の場合は、利用時間を減らさず、ロックもしない。
 - 対象外ユーザーでスキップした時刻を `usage_baseline_local_at` に保存し、親アカウント利用中の経過時間を次回 `usageDeltaSeconds` に含めない。
-- `monitored_user_name` は初期運用では子どもアカウント名の `yuuto` を設定する。
+- `monitored_user_name` は初期運用では子どもアカウント名の `child` を設定する。
 
 ## 画面ロック中の扱い
 

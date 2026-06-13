@@ -8,7 +8,7 @@ const isRemoteMode = Boolean(
 );
 
 const defaultState = {
-  childName: "yuuto",
+  childName: "child",
   remainingMinutes: 42,
   dailyLimitMinutes: 120,
   status: "利用可",
@@ -537,7 +537,7 @@ function render() {
           再開
         </button>
       </div>
-      <p>一時停止中は、yuuto のMac利用を止めます。</p>
+      <p>一時停止中は、child のMac利用を止めます。</p>
     </section>
 
     <section class="section history">

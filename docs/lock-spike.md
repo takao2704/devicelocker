@@ -81,7 +81,7 @@ delay に `0` を指定した結果:
 
 ```text
 $ scripts/lock-spike.sh set-delay-zero
-Enter password for Takao Ide :
+Enter password for Parent User :
 2026-06-12 20:19:59.452 sysadminctl[42871:292343] Unknown state for screenLock (0)
 ```
 

@@ -34,7 +34,7 @@ STACK_NAME=devicelocker-dev AWS_REGION=ap-northeast-1 scripts/deploy-aws.sh
 export AWS_REGION=ap-northeast-1
 export PARENT_ALLOWED_EMAILS="parent@example.com"
 export PARENT_ALLOWED_USER_IDS="child-001"
-export PARENT_CHILD_NAME="yuuto"
+export PARENT_CHILD_NAME="child"
 export PARENT_AUTH_DOMAIN_PREFIX="devicelocker-parent-unique-name"
 export PARENT_CALLBACK_URLS="http://127.0.0.1:4173/"
 export PARENT_LOGOUT_URLS="http://127.0.0.1:4173/"

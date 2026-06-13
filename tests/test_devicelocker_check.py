@@ -81,10 +81,10 @@ class DeviceLockerCheckTests(unittest.TestCase):
 
     def test_skips_when_console_user_is_not_monitored_user(self):
         config = json.loads(self.config_path.read_text(encoding="utf-8"))
-        config["monitored_user_name"] = "yuuto"
+        config["monitored_user_name"] = "child"
         self.config_path.write_text(json.dumps(config), encoding="utf-8")
 
-        with mock.patch.object(self.module, "get_console_user", return_value="takaoide"), \
+        with mock.patch.object(self.module, "get_console_user", return_value="parent-admin"), \
              mock.patch.object(self.module, "post_check") as post_check, \
              mock.patch.object(self.module.subprocess, "run") as run, \
              mock.patch.object(self.module.time, "time", return_value=2000):
@@ -94,16 +94,16 @@ class DeviceLockerCheckTests(unittest.TestCase):
         post_check.assert_not_called()
         run.assert_not_called()
         state = self.read_state()
-        self.assertEqual(state["last_console_user"], "takaoide")
+        self.assertEqual(state["last_console_user"], "parent-admin")
         self.assertEqual(state["last_skipped_local_at"], 2000)
         self.assertEqual(state["usage_baseline_local_at"], 2000)
 
     def test_skips_when_screen_is_locked(self):
         config = json.loads(self.config_path.read_text(encoding="utf-8"))
-        config["monitored_user_name"] = "yuuto"
+        config["monitored_user_name"] = "child"
         self.config_path.write_text(json.dumps(config), encoding="utf-8")
 
-        with mock.patch.object(self.module, "get_console_user", return_value="yuuto"), \
+        with mock.patch.object(self.module, "get_console_user", return_value="child"), \
              mock.patch.object(self.module, "is_screen_locked", return_value=True), \
              mock.patch.object(self.module, "post_check") as post_check, \
              mock.patch.object(self.module.subprocess, "run") as run, \

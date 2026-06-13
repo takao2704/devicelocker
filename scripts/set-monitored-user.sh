@@ -6,7 +6,7 @@ MONITORED_USER_NAME="${1:-}"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "This command needs root privileges. Re-run with sudo:" >&2
-  echo "  sudo $0 yuuto" >&2
+  echo "  sudo $0 child" >&2
   exit 1
 fi
 
