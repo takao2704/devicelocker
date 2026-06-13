@@ -195,6 +195,39 @@ class CheckMacStatusLambdaTests(unittest.TestCase):
         self.assertEqual(usage_history[0]["minutes"], -1)
         self.assertEqual(usage_history[0]["remainingSeconds"], 60)
 
+    def test_consecutive_usage_history_is_merged(self):
+        now = 1760000061
+        self.tables["control"].items[(("UserId", "child-001"),)]["UsageHistoryJson"] = json.dumps([
+            {
+                "id": "usage-1",
+                "at": now - 61,
+                "title": "Mac利用",
+                "detail": "1分1秒を消化",
+                "minutes": -2,
+                "seconds": 61,
+                "type": "usage",
+                "deviceId": "macbook-001",
+                "remainingSeconds": 59,
+            }
+        ])
+
+        with mock.patch.object(self.module.time, "time", return_value=now):
+            result = self.module.handler(event(self.module, timestamp=now, usage_delta=19, nonce="merge"), None)
+        body = self.response_body(result)
+        saved = self.tables["control"].items[(("UserId", "child-001"),)]
+        usage_history = json.loads(saved["UsageHistoryJson"])
+
+        self.assertEqual(result["statusCode"], 200)
+        self.assertEqual(body["remainingSeconds"], 101)
+        self.assertEqual(len(usage_history), 1)
+        self.assertEqual(usage_history[0]["id"], "usage-1")
+        self.assertEqual(usage_history[0]["at"], now)
+        self.assertEqual(usage_history[0]["startedAt"], now - 61)
+        self.assertEqual(usage_history[0]["seconds"], 80)
+        self.assertEqual(usage_history[0]["minutes"], -2)
+        self.assertEqual(usage_history[0]["detail"], "1分20秒を消化")
+        self.assertEqual(usage_history[0]["remainingSeconds"], 101)
+
     def test_time_exhausted_denies(self):
         result = self.module.handler(event(self.module, usage_delta=120), None)
         body = self.response_body(result)

@@ -1,6 +1,7 @@
 const STORAGE_KEY = "devicelocker-parent-ui-v1";
 const AUTH_STORAGE_KEY = "devicelocker-parent-auth-v1";
 const AUTH_PENDING_KEY = "devicelocker-parent-auth-pending-v1";
+const USAGE_EVENT_MERGE_WINDOW_SECONDS = 180;
 
 const remoteConfig = window.DEVICELOCKER_CONFIG || {};
 const isRemoteMode = Boolean(
@@ -310,16 +311,37 @@ function formatHistoryTime(at) {
   return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
 }
 
+function formatHistoryTimeRange(startAt, endAt) {
+  if (!startAt || !endAt || startAt === endAt) return formatHistoryTime(endAt || startAt);
+  const start = new Date(Number(startAt) * 1000);
+  const end = new Date(Number(endAt) * 1000);
+  const today = new Date();
+  const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const startTime = timeFormatter.format(start);
+  const endTime = timeFormatter.format(end);
+  if (sameLocalDay(start, end)) {
+    const prefix = sameLocalDay(end, today) ? "今日" : `${end.getMonth() + 1}/${end.getDate()}`;
+    return `${prefix} ${startTime}-${endTime}`;
+  }
+  return `${start.getMonth() + 1}/${start.getDate()} ${startTime}-${end.getMonth() + 1}/${end.getDate()} ${endTime}`;
+}
+
 function normalizeHistory(items = []) {
   return items.map((item) => ({
     id: item.id || crypto.randomUUID(),
     at: Number(item.at || Math.floor(Date.now() / 1000)),
+    startedAt: Number(item.startedAt || item.at || 0),
     time: item.time || formatHistoryTime(item.at),
     title: item.title || "操作",
     detail: item.detail || "",
     minutes: Number(item.minutes || 0),
     seconds: Number(item.seconds || 0),
     type: item.type || "add",
+    deviceId: item.deviceId || "",
   }));
 }
 
@@ -456,15 +478,47 @@ function historyEvents(parentHistory = [], usageHistory = []) {
     ...item,
     deltaSeconds: historyDeltaSeconds(item),
     sortKey: Number(item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
+    startSortKey: Number(item.startedAt || item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
   }));
   const usageEvents = usageHistory.map((item, index) => ({
     ...item,
     deltaSeconds: historyDeltaSeconds(item),
     sortKey: Number(item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
+    startSortKey: Number(item.startedAt || item.at || 0) || Math.floor(Date.now() / 1000) - index * 2,
   }));
   return [...parentEvents, ...usageEvents]
     .filter((item) => item.deltaSeconds !== 0)
     .sort((a, b) => b.sortKey - a.sortKey);
+}
+
+function mergeConsecutiveUsageEvents(events) {
+  return events.reduce((merged, item) => {
+    const previous = merged[merged.length - 1];
+    const canMerge = previous
+      && previous.type === "usage"
+      && item.type === "usage"
+      && previous.deviceId === item.deviceId
+      && previous.startSortKey >= item.sortKey
+      && previous.startSortKey - item.sortKey <= USAGE_EVENT_MERGE_WINDOW_SECONDS;
+    if (!canMerge) {
+      merged.push({ ...item });
+      return merged;
+    }
+
+    const seconds = Number(previous.seconds || Math.abs(previous.deltaSeconds)) + Number(item.seconds || Math.abs(item.deltaSeconds));
+    const startSortKey = Math.min(previous.startSortKey || previous.sortKey, item.startSortKey || item.sortKey);
+    const endSortKey = Math.max(previous.sortKey, item.sortKey);
+    previous.deltaSeconds = -seconds;
+    previous.seconds = seconds;
+    previous.minutes = -Math.ceil(seconds / 60);
+    previous.startSortKey = startSortKey;
+    previous.sortKey = endSortKey;
+    previous.startedAt = startSortKey;
+    previous.at = endSortKey;
+    previous.time = formatHistoryTimeRange(startSortKey, endSortKey);
+    previous.detail = `${formatDuration(seconds)}を消化`;
+    return merged;
+  }, []);
 }
 
 function historyChartDays(parentHistory = [], usageHistory = []) {
@@ -537,7 +591,7 @@ function renderHistoryGraph(parentHistory, usageHistory) {
       </div>
     </div>
     <div class="history-list compact-history-list">
-      ${recentEvents.slice(0, 5).map(renderHistoryRow).join("")}
+      ${mergeConsecutiveUsageEvents(recentEvents).slice(0, 5).map(renderHistoryRow).join("")}
     </div>
   `;
 }

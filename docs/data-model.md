@@ -44,7 +44,7 @@
 ]
 ```
 
-`UsageHistoryJson` は Mac エージェントの `/v1/check` で実際に `RemainingSeconds` から減算した秒数だけを記録する。残り 30 秒の状態で 60 秒報告された場合、履歴には 30 秒消化として残す。
+`UsageHistoryJson` は Mac エージェントの `/v1/check` で実際に `RemainingSeconds` から減算した秒数だけを記録する。残り 30 秒の状態で 60 秒報告された場合、履歴には 30 秒消化として残す。直近の `Mac利用` 履歴が同じ端末かつ 180 秒以内なら、秒数を足して 1 件の連続利用履歴にまとめる。連続利用の開始時刻は `startedAt`、最後の報告時刻は `at` に入れる。
 
 MVP では親 Web UI と CLI の両方が同じ `RemainingSeconds` / `IsApproved` を更新する。報酬ルール、親操作履歴、時間消化履歴は Web UI 表示用の補助属性として扱う。
 

@@ -34,6 +34,7 @@ PARENT_CHILD_NAME = os.environ.get("PARENT_CHILD_NAME", "child")
 MAX_PARENT_ADD_MINUTES = int(os.environ.get("MAX_PARENT_ADD_MINUTES", "360"))
 PARENT_HISTORY_LIMIT = int(os.environ.get("PARENT_HISTORY_LIMIT", "20"))
 PARENT_USAGE_HISTORY_LIMIT = int(os.environ.get("PARENT_USAGE_HISTORY_LIMIT", "30"))
+USAGE_HISTORY_MERGE_WINDOW_SECONDS = int(os.environ.get("USAGE_HISTORY_MERGE_WINDOW_SECONDS", "180"))
 ONLINE_WINDOW_SECONDS = int(os.environ.get("ONLINE_WINDOW_SECONDS", "180"))
 PARENT_COGNITO_DOMAIN = os.environ.get("PARENT_COGNITO_DOMAIN", "")
 PARENT_USER_POOL_CLIENT_ID = os.environ.get("PARENT_USER_POOL_CLIENT_ID", "")
@@ -254,7 +255,27 @@ def append_history(item, entry):
 
 def append_usage_history(item, entry):
     history = usage_history_from_item(item)
-    next_history = [{**entry, "id": entry.get("id") or f"{entry.get('at', int(time.time()))}-{entry.get('type', 'usage')}"}]
+    next_entry = {**entry, "id": entry.get("id") or f"{entry.get('at', int(time.time()))}-{entry.get('type', 'usage')}"}
+    if history and next_entry.get("type") == "usage":
+        latest = history[0]
+        latest_at = to_int(latest.get("at"))
+        next_at = to_int(next_entry.get("at"))
+        same_device = latest.get("deviceId") == next_entry.get("deviceId")
+        close_enough = 0 <= next_at - latest_at <= USAGE_HISTORY_MERGE_WINDOW_SECONDS
+        if latest.get("type") == "usage" and same_device and close_enough:
+            merged_seconds = to_int(latest.get("seconds")) + to_int(next_entry.get("seconds"))
+            merged = {
+                **latest,
+                "at": next_at,
+                "startedAt": latest.get("startedAt") or latest.get("at"),
+                "detail": f"{duration_label(merged_seconds)}を消化",
+                "minutes": -minutes_from_seconds(merged_seconds),
+                "seconds": merged_seconds,
+                "remainingSeconds": next_entry.get("remainingSeconds", latest.get("remainingSeconds")),
+            }
+            return [merged, *history[1:]][:PARENT_USAGE_HISTORY_LIMIT]
+
+    next_history = [next_entry]
     next_history.extend(history)
     return next_history[:PARENT_USAGE_HISTORY_LIMIT]
 
