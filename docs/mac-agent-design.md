@@ -6,6 +6,8 @@
 | --- | --- | --- | --- |
 | LaunchDaemon | `/Library/LaunchDaemons/com.devicelocker.agent.plist` | `root:wheel` | `644` |
 | 実行ファイル | `/usr/local/sbin/devicelocker-check` | `root:wheel` | `750` |
+| ロックコマンド | `/usr/local/sbin/devicelocker-lock` | `root:wheel` | `755` |
+| 通知コマンド | `/usr/local/sbin/devicelocker-notify` | `root:wheel` | `755` |
 | ログローテーション設定 | `/etc/newsyslog.d/com.devicelocker.conf` | `root:wheel` | `644` |
 | 設定ディレクトリ | `/Library/Application Support/DeviceLocker` | `root:wheel` | `750` |
 | 状態ディレクトリ | `/var/db/devicelocker` | `root:wheel` | `750` |
@@ -43,6 +45,12 @@
 
 ```sh
 sudo scripts/install-agent.sh
+```
+
+ロックコマンドと通知コマンドは以下で配置する。
+
+```sh
+sudo scripts/install-lock-command.sh
 ```
 
 インストール後、起動前に以下を作成する。
@@ -109,7 +117,7 @@ API check interval reached?
   v
 call CheckMacStatus
   |
-  +-- success + allow --> update remaining time/state --> exit
+  +-- success + allow --> update remaining time/state --> threshold notification? --> exit
   |
   +-- success + deny  --> update state --> lock --> exit
   |
@@ -153,6 +161,14 @@ call CheckMacStatus
 - `usageDeltaSeconds` は過大報告や異常値を防ぐため、サーバー側で 0 から 120 秒程度に丸める。
 - 残り時間がゼロ以下になった場合、API は `deny` を返す。
 - ログアウト中の扱いは後続で精密化する。
+
+## 残り時間通知
+
+- API の `allow` 応答で `remainingSeconds` が 300 秒、180 秒、60 秒に到達または下回ったタイミングで通知を出す。
+- 通知済みのしきい値は `notified_remaining_thresholds` として状態ファイルに保存し、同じ残り時間帯で繰り返し通知しない。
+- 親が時間を追加して残り時間が通知済みしきい値を上回った場合、そのしきい値は再通知可能な状態に戻す。
+- 通知は `/usr/local/sbin/devicelocker-notify` を root LaunchDaemon から呼び出して、現在のコンソールユーザーの GUI セッションに `osascript display notification` を出す。
+- 通知コマンドが存在しない、または失敗した場合でも、減算・ロック判定は継続する。
 
 ## ロック実行
 

@@ -115,6 +115,7 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "screen_locked": false,
   "last_screen_locked_local_at": null,
   "grace_until": 1760000065,
+  "notified_remaining_thresholds": [300, 180],
   "locked_at": null,
   "policy_version": 3
 }
@@ -136,6 +137,9 @@ HMAC 署名検証のため、デバイス情報は別テーブルに分離する
   "token_path": "/Library/Application Support/DeviceLocker/device.token",
   "state_path": "/var/db/devicelocker/state.json",
   "lock_command": "/usr/local/sbin/devicelocker-lock",
+  "notification_command": "/usr/local/sbin/devicelocker-notify",
+  "notification_title": "DeviceLocker",
+  "notification_threshold_seconds": [300, 180, 60],
   "grace_period_seconds": 60,
   "timeout_seconds": 5,
   "max_usage_delta_seconds": 120,

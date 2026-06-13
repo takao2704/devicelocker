@@ -79,6 +79,93 @@ class DeviceLockerCheckTests(unittest.TestCase):
         self.assertEqual(state["last_api_check_local_at"], 2000)
         self.assertEqual(state["usage_baseline_local_at"], 2000)
 
+    def test_allow_sends_remaining_time_notification_when_threshold_is_crossed(self):
+        notify_path = self.base / "notify"
+        notify_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        notify_path.chmod(0o755)
+        self.update_config(notification_command=str(notify_path), check_interval_seconds=1)
+        self.state_path.write_text(json.dumps({
+            "last_decision": "allow",
+            "last_success_local_at": 1900,
+            "remaining_seconds": 360,
+            "usage_baseline_local_at": 1900,
+        }), encoding="utf-8")
+        response = {
+            "decision": "allow",
+            "remainingSeconds": 300,
+            "serverTime": 1000,
+        }
+
+        with mock.patch.object(self.module, "post_check", return_value=response), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
+             mock.patch.object(self.module.subprocess, "run", return_value=mock.Mock(returncode=0)) as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        run.assert_called_once_with(
+            [str(notify_path), "DeviceLocker", "あと5分でMacの利用時間がなくなります"],
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(self.read_state()["notified_remaining_thresholds"], [300])
+
+    def test_remaining_time_notification_is_not_repeated(self):
+        notify_path = self.base / "notify"
+        notify_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        notify_path.chmod(0o755)
+        self.update_config(notification_command=str(notify_path), check_interval_seconds=1)
+        self.state_path.write_text(json.dumps({
+            "last_decision": "allow",
+            "last_success_local_at": 1900,
+            "remaining_seconds": 240,
+            "notified_remaining_thresholds": [300],
+            "usage_baseline_local_at": 1900,
+        }), encoding="utf-8")
+        response = {
+            "decision": "allow",
+            "remainingSeconds": 200,
+            "serverTime": 1000,
+        }
+
+        with mock.patch.object(self.module, "post_check", return_value=response), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        run.assert_not_called()
+        self.assertEqual(self.read_state()["notified_remaining_thresholds"], [300])
+
+    def test_remaining_time_notification_resets_after_time_is_added(self):
+        notify_path = self.base / "notify"
+        notify_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        notify_path.chmod(0o755)
+        self.update_config(notification_command=str(notify_path), check_interval_seconds=1)
+        self.state_path.write_text(json.dumps({
+            "last_decision": "allow",
+            "last_success_local_at": 1900,
+            "remaining_seconds": 120,
+            "notified_remaining_thresholds": [300, 180],
+            "usage_baseline_local_at": 1900,
+        }), encoding="utf-8")
+        response = {
+            "decision": "allow",
+            "remainingSeconds": 600,
+            "serverTime": 1000,
+        }
+
+        with mock.patch.object(self.module, "post_check", return_value=response), \
+             mock.patch.object(self.module, "is_screen_locked", return_value=False), \
+             mock.patch.object(self.module.subprocess, "run") as run, \
+             mock.patch.object(self.module.time, "time", return_value=2000):
+            code = self.module.main(["devicelocker-check", str(self.config_path)])
+
+        self.assertEqual(code, 0)
+        run.assert_not_called()
+        self.assertEqual(self.read_state()["notified_remaining_thresholds"], [])
+
     def test_skips_when_console_user_is_not_monitored_user(self):
         config = json.loads(self.config_path.read_text(encoding="utf-8"))
         config["monitored_user_name"] = "child"

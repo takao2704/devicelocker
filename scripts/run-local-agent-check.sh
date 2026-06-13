@@ -8,6 +8,8 @@ TOKEN_PATH="$TMP_DIR/device.token"
 STATE_PATH="$TMP_DIR/state.json"
 LOCK_LOG="$TMP_DIR/lock.log"
 LOCK_STUB="$TMP_DIR/lock-stub.sh"
+NOTIFY_LOG="$TMP_DIR/notify.log"
+NOTIFY_STUB="$TMP_DIR/notify-stub.sh"
 
 mkdir -p "$TMP_DIR"
 
@@ -23,6 +25,13 @@ exit 0
 SCRIPT
 chmod +x "$LOCK_STUB"
 
+cat > "$NOTIFY_STUB" <<SCRIPT
+#!/bin/sh
+echo "\$(date '+%Y-%m-%dT%H:%M:%S%z') notification: \$*" >> "$NOTIFY_LOG"
+exit 0
+SCRIPT
+chmod +x "$NOTIFY_STUB"
+
 cat > "$CONFIG_PATH" <<JSON
 {
   "api_base_url": "http://127.0.0.1:8765",
@@ -32,6 +41,9 @@ cat > "$CONFIG_PATH" <<JSON
   "token_path": "$TOKEN_PATH",
   "state_path": "$STATE_PATH",
   "lock_command": "$LOCK_STUB",
+  "notification_command": "$NOTIFY_STUB",
+  "notification_title": "DeviceLocker",
+  "notification_threshold_seconds": [300, 180, 60],
   "grace_period_seconds": 60,
   "timeout_seconds": 2,
   "max_usage_delta_seconds": 120,
@@ -55,6 +67,13 @@ fi
 echo "Lock log:"
 if [ -f "$LOCK_LOG" ]; then
   cat "$LOCK_LOG"
+else
+  echo "(empty)"
+fi
+
+echo "Notification log:"
+if [ -f "$NOTIFY_LOG" ]; then
+  cat "$NOTIFY_LOG"
 else
   echo "(empty)"
 fi

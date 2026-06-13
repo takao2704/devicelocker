@@ -11,6 +11,7 @@ DeviceLocker は、子ども用 Mac の利用可能時間を AWS 側で管理し
 - `RemainingSeconds=0` で Mac がロックされる。
 - `monitored_user_name` に設定した子どもアカウントが前面のときだけ利用時間を消費し、ロック対象にする。
 - 画面ロック中は利用時間を消費しない。
+- 残り 5 分、3 分、1 分に到達または下回ったタイミングで Mac に通知を表示する。
 - `stop` 操作で Mac がロックされる。
 - `start` と `+30` で利用を再開できる。
 - オフラインまたは API 失敗時は 1 分の猶予後にロックする。
@@ -29,8 +30,10 @@ flowchart TB
     LaunchDaemon["LaunchDaemon<br/>com.devicelocker.agent"]
     Check["/usr/local/sbin/devicelocker-check"]
     Lock["/usr/local/sbin/devicelocker-lock"]
+    Notify["/usr/local/sbin/devicelocker-notify"]
     Config["config.json<br/>device.token"]
     Screen["画面ロック"]
+    Notification["macOS 通知"]
   end
 
   subgraph AWS["AWS"]
@@ -50,7 +53,9 @@ flowchart TB
   LaunchDaemon --> Check
   Check --> Config
   Check -->|"HMAC 署名<br/>POST /v1/check"| Api
+  Check -->|"残り 5/3/1 分"| Notify
   Check -->|"deny / offline / time_exhausted"| Lock
+  Notify --> Notification
   Lock --> Screen
 
   Api --> Lambda
@@ -90,7 +95,7 @@ scripts/seed-aws-device.sh
 
 ### 親の管理者アカウントで実行
 
-ロックコマンドをインストールする。
+ロックコマンドと通知コマンドをインストールする。
 
 ```sh
 sudo scripts/install-lock-command.sh

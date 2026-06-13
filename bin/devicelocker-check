@@ -19,6 +19,9 @@ DEFAULT_CONFIG_PATH = "/Library/Application Support/DeviceLocker/config.json"
 DEFAULT_TOKEN_PATH = "/Library/Application Support/DeviceLocker/device.token"
 DEFAULT_STATE_PATH = "/var/db/devicelocker/state.json"
 DEFAULT_LOCK_COMMAND = "/usr/local/sbin/devicelocker-lock"
+DEFAULT_NOTIFICATION_COMMAND = "/usr/local/sbin/devicelocker-notify"
+DEFAULT_NOTIFICATION_TITLE = "DeviceLocker"
+DEFAULT_NOTIFICATION_THRESHOLD_SECONDS = [300, 180, 60]
 DEFAULT_CHECK_PATH = "/v1/check"
 DEFAULT_TIMEOUT_SECONDS = 5
 DEFAULT_GRACE_PERIOD_SECONDS = 60
@@ -69,6 +72,11 @@ def load_config(path):
     config.setdefault("token_path", DEFAULT_TOKEN_PATH)
     config.setdefault("state_path", DEFAULT_STATE_PATH)
     config.setdefault("lock_command", DEFAULT_LOCK_COMMAND)
+    config.setdefault("notification_command", DEFAULT_NOTIFICATION_COMMAND)
+    config.setdefault("notification_title", DEFAULT_NOTIFICATION_TITLE)
+    config["notification_threshold_seconds"] = notification_thresholds(
+        config.get("notification_threshold_seconds"),
+    )
     config.setdefault("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
     config.setdefault("grace_period_seconds", DEFAULT_GRACE_PERIOD_SECONDS)
     config.setdefault("max_usage_delta_seconds", DEFAULT_MAX_USAGE_DELTA_SECONDS)
@@ -195,6 +203,97 @@ def run_lock(config, state, now):
     subprocess.run([command], check=False)
 
 
+def notification_thresholds(value):
+    if value is None:
+        raw_thresholds = DEFAULT_NOTIFICATION_THRESHOLD_SECONDS
+    elif isinstance(value, str):
+        raw_thresholds = [item.strip() for item in value.split(",")]
+    elif isinstance(value, (list, tuple)):
+        raw_thresholds = value
+    else:
+        raw_thresholds = DEFAULT_NOTIFICATION_THRESHOLD_SECONDS
+
+    parsed = set()
+    for item in raw_thresholds:
+        try:
+            threshold = int(item)
+        except (TypeError, ValueError):
+            continue
+        if threshold > 0:
+            parsed.add(threshold)
+    if not parsed:
+        parsed = set(DEFAULT_NOTIFICATION_THRESHOLD_SECONDS)
+    return sorted(parsed, reverse=True)
+
+
+def notified_thresholds(state, thresholds):
+    allowed = set(thresholds)
+    parsed = set()
+    for item in state.get("notified_remaining_thresholds", []):
+        try:
+            threshold = int(item)
+        except (TypeError, ValueError):
+            continue
+        if threshold in allowed:
+            parsed.add(threshold)
+    return parsed
+
+
+def active_notified_thresholds(state, remaining_seconds, thresholds):
+    return sorted(
+        [
+            threshold
+            for threshold in notified_thresholds(state, thresholds)
+            if remaining_seconds <= threshold
+        ],
+        reverse=True,
+    )
+
+
+def crossed_notification_thresholds(previous_remaining, remaining_seconds, notified, thresholds):
+    try:
+        previous = int(previous_remaining)
+        remaining = int(remaining_seconds)
+    except (TypeError, ValueError):
+        return []
+    if previous <= remaining:
+        return []
+    return [
+        threshold
+        for threshold in thresholds
+        if threshold not in notified and previous >= threshold and remaining <= threshold
+    ]
+
+
+def duration_label(seconds):
+    seconds = int(seconds)
+    minutes, rest = divmod(seconds, 60)
+    if rest == 0:
+        return f"{minutes}分"
+    if minutes == 0:
+        return f"{rest}秒"
+    return f"{minutes}分{rest}秒"
+
+
+def send_notification(config, threshold):
+    command = config.get("notification_command")
+    if not command:
+        return
+    if os.path.isabs(command) and not os.path.exists(command):
+        log(f"notification skipped: command not found: {command}")
+        return
+
+    title = str(config.get("notification_title") or DEFAULT_NOTIFICATION_TITLE)
+    message = f"あと{duration_label(threshold)}でMacの利用時間がなくなります"
+    try:
+        result = subprocess.run([command, title, message], check=False, timeout=5)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log(f"notification failed: {exc}")
+        return
+    if result.returncode != 0:
+        log(f"notification failed: returncode={result.returncode}")
+
+
 def skip_usage(config, state, now, reason, updates):
     updated = dict(state)
     updated["last_skipped_local_at"] = now
@@ -319,7 +418,30 @@ def main(argv):
         return 2
 
     decision = str(response.get("decision", "")).lower()
+    previous_remaining = state.get("remaining_seconds")
     updated_state = state_from_response(response, state, now, config["grace_period_seconds"])
+    thresholds = config["notification_threshold_seconds"]
+    active_notified = active_notified_thresholds(
+        state,
+        updated_state["remaining_seconds"],
+        thresholds,
+    )
+    crossed_thresholds = crossed_notification_thresholds(
+        previous_remaining,
+        updated_state["remaining_seconds"],
+        set(active_notified),
+        thresholds,
+    )
+    updated_state["notified_remaining_thresholds"] = active_notified
+
+    if decision == "allow" and crossed_thresholds:
+        threshold_to_send = min(crossed_thresholds)
+        send_notification(config, threshold_to_send)
+        updated_state["notified_remaining_thresholds"] = sorted(
+            set(active_notified).union(crossed_thresholds),
+            reverse=True,
+        )
+
     write_json_atomic(config["state_path"], updated_state)
 
     if decision == "allow":

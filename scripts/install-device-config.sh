@@ -17,6 +17,9 @@ MAX_USAGE_DELTA_SECONDS="${MAX_USAGE_DELTA_SECONDS:-120}"
 CHECK_INTERVAL_SECONDS="${CHECK_INTERVAL_SECONDS:-60}"
 EXHAUSTED_CHECK_INTERVAL_SECONDS="${EXHAUSTED_CHECK_INTERVAL_SECONDS:-10}"
 LOCK_COMMAND="${LOCK_COMMAND:-/usr/local/sbin/devicelocker-lock}"
+NOTIFICATION_COMMAND="${NOTIFICATION_COMMAND:-/usr/local/sbin/devicelocker-notify}"
+NOTIFICATION_TITLE="${NOTIFICATION_TITLE:-DeviceLocker}"
+NOTIFICATION_THRESHOLD_SECONDS="${NOTIFICATION_THRESHOLD_SECONDS:-[300, 180, 60]}"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "This installer needs root privileges. Re-run with sudo and env vars:" >&2
@@ -50,6 +53,9 @@ cat > "$CONFIG_PATH" <<JSON
   "token_path": "$TOKEN_PATH",
   "state_path": "/var/db/devicelocker/state.json",
   "lock_command": "$LOCK_COMMAND",
+  "notification_command": "$NOTIFICATION_COMMAND",
+  "notification_title": "$NOTIFICATION_TITLE",
+  "notification_threshold_seconds": $NOTIFICATION_THRESHOLD_SECONDS,
   "grace_period_seconds": $GRACE_PERIOD_SECONDS,
   "timeout_seconds": $TIMEOUT_SECONDS,
   "max_usage_delta_seconds": $MAX_USAGE_DELTA_SECONDS,

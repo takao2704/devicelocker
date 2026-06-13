@@ -156,9 +156,11 @@ sudo scripts/install-lock-command.sh
 ```text
 root:wheel 755 /usr/local/sbin/devicelocker-lock
 root:wheel 755 /usr/local/sbin/devicelocker-lock-spike
+root:wheel 755 /usr/local/sbin/devicelocker-notify
 ```
 
 `devicelocker-lock-spike` は、親ホーム配下のリポジトリを読めない子どもアカウントでも検証できるようにするための一時的な確認コマンド。
+`devicelocker-notify` は、root LaunchDaemon から現在のコンソールユーザーの GUI セッションへ残り時間通知を出すための補助コマンド。
 
 この方式は `pmset displaysleepnow` 単体ではなく、事前設定と組み合わせて検証する。
 
@@ -186,7 +188,7 @@ root:wheel 755 /usr/local/sbin/devicelocker-lock-spike
 
 ## 次の検証
 
-1. `sudo scripts/install-lock-command.sh` で `/usr/local/sbin/devicelocker-lock` と `/usr/local/sbin/devicelocker-lock-spike` を作成する。
+1. `sudo scripts/install-lock-command.sh` で `/usr/local/sbin/devicelocker-lock`、`/usr/local/sbin/devicelocker-lock-spike`、`/usr/local/sbin/devicelocker-notify` を作成する。
 2. 子どもアカウントで `/usr/local/sbin/devicelocker-lock-spike status` を実行し、現在の screenLock delay を確認する。
 3. 子どもアカウントで `/usr/local/sbin/devicelocker-lock-spike set-delay-immediate` を実行し、screenLock delay を immediate に設定できるか確認する。
 4. 子どもアカウントで `/usr/local/sbin/devicelocker-lock` を実行し、復帰時にパスワード入力が必要か確認する。

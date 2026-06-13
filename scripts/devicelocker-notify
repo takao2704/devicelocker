@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+TITLE="${1:-DeviceLocker}"
+MESSAGE="${2:-}"
+
+if [ -z "$MESSAGE" ]; then
+  exit 0
+fi
+
+CONSOLE_UID="$(/usr/bin/stat -f %u /dev/console 2>/dev/null || true)"
+CONSOLE_USER="$(/usr/bin/stat -f %Su /dev/console 2>/dev/null || true)"
+
+if [ -z "$CONSOLE_UID" ] || [ "$CONSOLE_UID" = "0" ] || [ "$CONSOLE_USER" = "root" ]; then
+  exit 0
+fi
+
+exec /bin/launchctl asuser "$CONSOLE_UID" \
+  /usr/bin/sudo -u "#$CONSOLE_UID" \
+  /usr/bin/osascript - "$TITLE" "$MESSAGE" <<'OSA'
+on run argv
+  display notification (item 2 of argv) with title (item 1 of argv)
+end run
+OSA
